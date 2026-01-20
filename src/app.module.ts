@@ -1,4 +1,9 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import {
+  Module,
+  MiddlewareConsumer,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -25,17 +30,42 @@ import { EmailModule } from './modules/email/email.module';
     // Database
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: +configService.get('DB_PORT'),
-        username: configService.get('DB_USERNAME'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_DATABASE'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') === 'development',
-        logging: configService.get('NODE_ENV') === 'development',
-      }),
+      useFactory: (configService: ConfigService) => {
+        const readString = (key: string) => {
+          const value = configService.get<string | Uint8Array>(key);
+          if (typeof value === 'string') {
+            return value;
+          }
+          if (value instanceof Uint8Array) {
+            return Buffer.from(value).toString();
+          }
+          return undefined;
+        };
+
+        const databaseUrl = readString('DATABASE_URL');
+        const useSsl =
+          readString('DB_SSL') === 'true' ||
+          (!!databaseUrl && databaseUrl.includes('supabase.co'));
+
+        const nodeEnv = readString('NODE_ENV');
+
+        return {
+          type: 'postgres',
+          ...(databaseUrl
+            ? { url: databaseUrl }
+            : {
+                host: readString('DB_HOST'),
+                port: +(readString('DB_PORT') ?? 5432),
+                username: readString('DB_USERNAME'),
+                password: readString('DB_PASSWORD'),
+                database: readString('DB_DATABASE'),
+              }),
+          ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: nodeEnv === 'development',
+          logging: nodeEnv === 'development',
+        };
+      },
       inject: [ConfigService],
     }),
 
@@ -55,6 +85,8 @@ import { EmailModule } from './modules/email/email.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes('*');
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes({ path: '*path', method: RequestMethod.ALL });
   }
 }
