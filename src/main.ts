@@ -6,6 +6,9 @@ import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
 import adminRoutes from './routes/admin.routes';
 import meRoutes from './routes/me.routes';
+import userRoutes from './routes/user.routes';
+import adminProductRoutes from './routes/admin.product.routes';
+import productRoutes from './routes/product.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -33,8 +36,11 @@ async function bootstrap() {
     return res.send(`token=${token}`);
   });
 
-  expressApp.use(meRoutes);
-  expressApp.use(adminRoutes);
+  expressApp.use('/api', meRoutes);
+  expressApp.use('/api', adminRoutes);
+  expressApp.use('/api', userRoutes);
+  expressApp.use('/api/admin/products', adminProductRoutes);
+  expressApp.use('/api', productRoutes);
 
   // CORS
   app.enableCors({
