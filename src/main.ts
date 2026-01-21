@@ -1,13 +1,40 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import passport from 'passport';
+import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
+import adminRoutes from './routes/admin.routes';
+import meRoutes from './routes/me.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Passport
+  app.use(passport.initialize());
+
+  // Minimal callback page for OAuth tests (no frontend required).
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.get('/auth/callback', (req: Request, res: Response) => {
+    const token = req.query.token;
+    const error = req.query.error;
+
+    if (error) {
+      return res.status(400).send(`OAuth error: ${error}`);
+    }
+
+    if (!token || Array.isArray(token)) {
+      return res.status(400).send('Missing token');
+    }
+
+    return res.send(`token=${token}`);
+  });
+
+  expressApp.use(meRoutes);
+  expressApp.use(adminRoutes);
 
   // CORS
   app.enableCors({
