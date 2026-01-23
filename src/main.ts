@@ -67,7 +67,7 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('somosHenry API')
+    .setTitle('NovadevAPI')
     .setDescription(
       'API documentation for NovaDev e-commerce deportivo project',
     )
