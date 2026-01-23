@@ -31,9 +31,14 @@ const schemas: Record<string, SchemaObject> = {
   ErrorResponse: {
     type: 'object',
     properties: {
-      error: { type: 'string' },
+      message: { type: 'string' },
+      details: { type: 'string', nullable: true },
     },
-    required: ['error'],
+    required: ['message'],
+    example: {
+      message: 'Validation error',
+      details: 'email: Invalid email',
+    },
   },
   OkResponse: {
     type: 'object',
@@ -347,6 +352,124 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['page', 'limit', 'total', 'data'],
   },
+  Product: {
+    allOf: [ref('ProductPublic')],
+  },
+  ProductsListResponse: {
+    allOf: [ref('ProductListResponse')],
+  },
+  CartProduct: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      name: { type: 'string' },
+      price: { type: 'string' },
+      currency: { type: 'string' },
+      stock: { type: 'integer' },
+      images: { type: 'array', items: { type: 'string', format: 'uri' }, nullable: true },
+      category: { type: 'string' },
+    },
+    required: ['id', 'name', 'price', 'currency', 'stock', 'category'],
+  },
+  CartItemResponse: {
+    type: 'object',
+    properties: {
+      product: ref('CartProduct'),
+      quantity: { type: 'integer' },
+      subtotal: { type: 'string' },
+    },
+    required: ['product', 'quantity', 'subtotal'],
+  },
+  CartResponse: {
+    type: 'object',
+    properties: {
+      items: { type: 'array', items: ref('CartItemResponse') },
+      total: { type: 'string' },
+    },
+    required: ['items', 'total'],
+    example: {
+      items: [
+        {
+          product: {
+            id: '0f3d7b3a-1c2e-4f4b-8e9c-3f5d6a7b8c9d',
+            name: 'Zapatillas Runner',
+            price: '199.99',
+            currency: 'ARS',
+            stock: 12,
+            images: ['https://example.com/img.jpg'],
+            category: 'running',
+          },
+          quantity: 1,
+          subtotal: '199.99',
+        },
+      ],
+      total: '199.99',
+    },
+  },
+  CreateOrderRequest: {
+    allOf: [ref('OrderCreateRequest')],
+  },
+  OrderResponse: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      status: { type: 'string' },
+      subtotal: { type: 'string' },
+      shipping_total: { type: 'string' },
+      discount_total: { type: 'string' },
+      total: { type: 'string' },
+      currency: { type: 'string' },
+      notes: { type: 'string', nullable: true },
+      created_at: { type: 'string', format: 'date-time' },
+      payment: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          provider: { type: 'string' },
+          amount: { type: 'string' },
+          transaction_id: { type: 'string', nullable: true },
+        },
+      },
+      items: { type: 'array', items: ref('OrderItemResponse') },
+    },
+    required: ['id', 'status', 'subtotal', 'total', 'currency', 'created_at', 'items'],
+  },
+  OrdersListResponse: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer' },
+      limit: { type: 'integer' },
+      total: { type: 'integer' },
+      data: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            status: { type: 'string' },
+            subtotal: { type: 'string' },
+            total: { type: 'string' },
+            currency: { type: 'string' },
+            created_at: { type: 'string', format: 'date-time' },
+            payment: {
+              type: 'object',
+              properties: {
+                status: { type: 'string' },
+                provider: { type: 'string' },
+                amount: { type: 'string' },
+              },
+            },
+            itemsCount: { type: 'integer' },
+          },
+          required: ['id', 'status', 'total', 'currency', 'created_at'],
+        },
+      },
+    },
+    required: ['page', 'limit', 'total', 'data'],
+  },
+  PaymentUpdateRequest: {
+    allOf: [ref('PaymentStatusRequest')],
+  },
   OrderItemRequest: {
     type: 'object',
     properties: {
@@ -397,6 +520,38 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['id', 'status', 'total', 'items', 'payment'],
   },
+  OrderFromCartResponse: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+      status: { type: 'string' },
+      total: { type: 'string' },
+      items: { type: 'array', items: ref('OrderItemResponse') },
+      payment: {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+        },
+        required: ['status'],
+      },
+    },
+    required: ['orderId', 'status', 'total', 'items', 'payment'],
+    example: {
+      orderId: '2f1a4d7e-9c0d-4b6a-8d9e-5a3e0a1b2c3d',
+      status: 'pendiente_pago',
+      total: '199.99',
+      items: [
+        {
+          productId: '0f3d7b3a-1c2e-4f4b-8e9c-3f5d6a7b8c9d',
+          product_name: 'Zapatillas Runner',
+          unit_price: '199.99',
+          quantity: 1,
+          subtotal: '199.99',
+        },
+      ],
+      payment: { status: 'pendiente' },
+    },
+  },
   PaymentStatusRequest: {
     type: 'object',
     properties: {
@@ -433,22 +588,58 @@ const extraPaths: PathsObject = {
       tags: ['auth'],
       summary: 'OAuth callback helper',
       parameters: [
-        {
-          name: 'token',
-          in: 'query',
-          required: false,
-          schema: { type: 'string' },
-        },
-        {
-          name: 'error',
-          in: 'query',
-          required: false,
-          schema: { type: 'string' },
-        },
+        { name: 'token', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'error', in: 'query', required: false, schema: { type: 'string' } },
       ],
       responses: {
         '200': textResponse('Token echo'),
         '400': textResponse('Missing token or OAuth error'),
+      },
+    },
+  },
+  '/api/auth/register': {
+    post: {
+      tags: ['auth'],
+      summary: 'Register user',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('RegisterRequest'),
+            example: {
+              email: 'user@example.com',
+              password: 'Password123',
+              firstName: 'Juan',
+              lastName: 'Perez',
+              phone: '+541112345678',
+            },
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('RegisterResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/auth/login': {
+    post: {
+      tags: ['auth'],
+      summary: 'Login user',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('LoginRequest'),
+            example: { email: 'user@example.com', password: 'Password123' },
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('LoginResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -467,6 +658,7 @@ const extraPaths: PathsObject = {
     get: {
       tags: ['auth'],
       summary: 'Handle Google OAuth callback',
+      description: 'Redirects to frontend callback',
       parameters: [
         {
           name: 'code',
@@ -641,12 +833,7 @@ const extraPaths: PathsObject = {
       summary: 'Update address for current user',
       security: bearerSecurity,
       parameters: [
-        {
-          name: 'id',
-          in: 'path',
-          required: true,
-          schema: { type: 'string', format: 'uuid' },
-        },
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
       ],
       requestBody: {
         required: true,
@@ -668,18 +855,47 @@ const extraPaths: PathsObject = {
       summary: 'Delete address for current user',
       security: bearerSecurity,
       parameters: [
-        {
-          name: 'id',
-          in: 'path',
-          required: true,
-          schema: { type: 'string', format: 'uuid' },
-        },
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
       ],
       responses: {
-        '204': {
-          description: 'Deleted',
-        },
+        '204': { description: 'Deleted' },
         '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/users/me/orders': {
+    get: {
+      tags: ['orders'],
+      summary: 'List current user orders',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+        { name: 'orderStatus', in: 'query', required: false, schema: { type: 'string', enum: ['pendiente_pago','pagado','en_preparacion','enviado','entregado'] } },
+        { name: 'paymentStatus', in: 'query', required: false, schema: { type: 'string', enum: ['pendiente','aprobado','rechazado','reembolsado'] } },
+        { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['newest','oldest'], default: 'newest' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('OrdersListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/users/me/orders/{id}': {
+    get: {
+      tags: ['orders'],
+      summary: 'Get current user order by id',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('OrderResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
       },
@@ -706,48 +922,13 @@ const extraPaths: PathsObject = {
       tags: ['products'],
       summary: 'List products',
       parameters: [
-        {
-          name: 'page',
-          in: 'query',
-          required: false,
-          schema: { type: 'integer', minimum: 1, default: 1 },
-        },
-        {
-          name: 'limit',
-          in: 'query',
-          required: false,
-          schema: { type: 'integer', minimum: 1, maximum: 50, default: 12 },
-        },
-        {
-          name: 'q',
-          in: 'query',
-          required: false,
-          schema: { type: 'string' },
-        },
-        {
-          name: 'category',
-          in: 'query',
-          required: false,
-          schema: { type: 'string' },
-        },
-        {
-          name: 'minPrice',
-          in: 'query',
-          required: false,
-          schema: { type: 'number', minimum: 0 },
-        },
-        {
-          name: 'maxPrice',
-          in: 'query',
-          required: false,
-          schema: { type: 'number', minimum: 0 },
-        },
-        {
-          name: 'inStock',
-          in: 'query',
-          required: false,
-          schema: { type: 'boolean' },
-        },
+        { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 12 } },
+        { name: 'q', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'category', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'minPrice', in: 'query', required: false, schema: { type: 'number', minimum: 0 } },
+        { name: 'maxPrice', in: 'query', required: false, schema: { type: 'number', minimum: 0 } },
+        { name: 'inStock', in: 'query', required: false, schema: { type: 'boolean' } },
         {
           name: 'sort',
           in: 'query',
@@ -762,6 +943,97 @@ const extraPaths: PathsObject = {
       responses: {
         '200': jsonResponse(ref('ProductListResponse')),
         '400': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/cart': {
+    get: {
+      tags: ['cart'],
+      summary: 'Get current cart',
+      security: bearerSecurity,
+      responses: {
+        '200': jsonResponse(ref('CartResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+    delete: {
+      tags: ['cart'],
+      summary: 'Clear cart',
+      security: bearerSecurity,
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/cart/items': {
+    post: {
+      tags: ['cart'],
+      summary: 'Add item to cart',
+      security: bearerSecurity,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                productId: { type: 'string', format: 'uuid' },
+                quantity: { type: 'integer', minimum: 1 },
+              },
+              required: ['productId', 'quantity'],
+            },
+            example: { productId: '0f3d7b3a-1c2e-4f4b-8e9c-3f5d6a7b8c9d', quantity: 2 },
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('OkResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/cart/items/{productId}': {
+    put: {
+      tags: ['cart'],
+      summary: 'Update cart item quantity',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'productId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: { quantity: { type: 'integer', minimum: 1 } },
+              required: ['quantity'],
+            },
+            example: { quantity: 3 },
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+    delete: {
+      tags: ['cart'],
+      summary: 'Remove item from cart',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'productId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -878,6 +1150,20 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/orders/from-cart': {
+    post: {
+      tags: ['orders'],
+      summary: 'Create order from cart',
+      description: 'Creates an order from the authenticated user cart and clears cart items.',
+      security: bearerSecurity,
+      responses: {
+        '201': jsonResponse(ref('OrderFromCartResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/admin/orders/{orderId}/payment': {
     patch: {
       tags: ['admin', 'orders'],
@@ -895,7 +1181,7 @@ const extraPaths: PathsObject = {
         required: true,
         content: {
           'application/json': {
-            schema: ref('PaymentStatusRequest'),
+            schema: ref('PaymentUpdateRequest'),
           },
         },
       },
@@ -965,6 +1251,30 @@ export function applySwaggerExtras(document: OpenAPIObject): OpenAPIObject {
     },
   };
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
