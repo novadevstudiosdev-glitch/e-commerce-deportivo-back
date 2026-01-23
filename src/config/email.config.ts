@@ -15,7 +15,7 @@ export default registerAs('email', () => ({
   // Configuración de emails
   defaults: {
     from: {
-      name: 'somosHenry',
+      name: 'NovaDev Studios',
       address: process.env.EMAIL_FROM || 'noreply@novadevstudios.com',
     },
   },
@@ -23,7 +23,7 @@ export default registerAs('email', () => ({
   // Templates de emails
   templates: {
     welcome: {
-      subject: '¡Bienvenido a somosHenry! 🎉',
+      subject: '¡Bienvenido a NovaDev! 🎉',
       template: 'welcome',
     },
     resetPassword: {
@@ -31,7 +31,7 @@ export default registerAs('email', () => ({
       template: 'reset-password',
     },
     notification: {
-      subject: 'Nueva notificación en somosHenry',
+      subject: 'Nueva notificación en NovaDev',
       template: 'notification',
     },
     classReminder: {
