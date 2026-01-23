@@ -4,11 +4,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import passport from 'passport';
 import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
-import adminRoutes from './routes/admin.routes';
-import meRoutes from './routes/me.routes';
-import userRoutes from './routes/user.routes';
-import adminProductRoutes from './routes/admin.product.routes';
-import productRoutes from './routes/product.routes';
+import { applySwaggerExtras } from './swagger/swagger-extras';
+import adminRoutes from './modules/admin/routes/admin.routes';
+import meRoutes from './modules/users/routes/me.routes';
+import userRoutes from './modules/users/routes/user.routes';
+import adminProductRoutes from './modules/products/routes/admin.product.routes';
+import productRoutes from './modules/products/routes/product.routes';
+import orderRoutes from './modules/orders/routes/order.routes';
+import adminOrderRoutes from './modules/orders/routes/admin.order.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -41,6 +44,8 @@ async function bootstrap() {
   expressApp.use('/api', userRoutes);
   expressApp.use('/api/admin/products', adminProductRoutes);
   expressApp.use('/api', productRoutes);
+  expressApp.use(orderRoutes);
+  expressApp.use('/admin/orders', adminOrderRoutes);
 
   // CORS
   app.enableCors({
@@ -67,12 +72,19 @@ async function bootstrap() {
     .addBearerAuth()
     .addTag('auth', 'Authentication endpoints')
     .addTag('users', 'User management')
+    .addTag('products', 'Product catalog')
+    .addTag('orders', 'Order management')
+    .addTag('admin', 'Admin operations')
+    .addTag('system', 'System utilities')
     .addTag('notifications', 'Notifications')
     .addTag('dashboard', 'Admin dashboard')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  const swaggerDocument = applySwaggerExtras(document);
+  SwaggerModule.setup('api/docs', app, swaggerDocument, {
+    swaggerOptions: { persistAuthorization: true },
+  });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

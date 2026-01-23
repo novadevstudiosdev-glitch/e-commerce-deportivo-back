@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { AppDataSource } from '../data-source';
-import { Product } from '../entities/Product';
+import { AppDataSource } from '../../../database/data-source';
+import { Product } from '../../../database/entities/Product';
 import { productQuerySchema } from '../schemas/product.query.schema';
 
 let dataSourceInit: Promise<void> | null = null;

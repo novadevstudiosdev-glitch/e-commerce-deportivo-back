@@ -4,12 +4,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EmailVerificationToken } from '../../entities/email-verification-token.entity';
-import { PasswordResetToken } from '../../entities/password-reset-token.entity';
-import { User } from '../../entities/user.entity';
-import { UserProfile } from '../../entities/user-profile.entity';
+import { EmailVerificationToken } from '../../database/entities/email-verification-token.entity';
+import { PasswordResetToken } from '../../database/entities/password-reset-token.entity';
+import { User } from '../../database/entities/user.entity';
+import { UserProfile } from '../../database/entities/user-profile.entity';
 import { GoogleStrategy } from '../../config/passport';
-import { EmailService } from '../../services/email.service';
+import { EmailService } from '../../common/services/email.service';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 

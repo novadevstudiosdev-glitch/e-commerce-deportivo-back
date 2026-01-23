@@ -5,7 +5,7 @@ import {
   normalizeDNI,
   normalizeEmail,
   normalizePhone,
-} from '../utils/normalize';
+} from '../../../utils/normalize';
 
 export const emailSchema = z.preprocess(
   (value) => (typeof value === 'string' ? normalizeEmail(value) : value),

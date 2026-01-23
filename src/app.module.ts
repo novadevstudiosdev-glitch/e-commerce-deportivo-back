@@ -5,6 +5,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import emailConfig from './config/email.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -25,6 +26,7 @@ import { EmailModule } from './modules/email/email.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      load: [emailConfig],
     }),
 
     // Database

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
-import { User } from '../../entities/user.entity';
+import { User } from '../../database/entities/user.entity';
 
 @Injectable()
 export class AuthService {

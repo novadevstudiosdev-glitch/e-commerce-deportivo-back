@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { requireAuth, requireRole } from '../../auth/middlewares/auth.middleware';
 import {
   createProduct,
   deleteProductById,

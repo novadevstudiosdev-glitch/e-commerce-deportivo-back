@@ -1,17 +1,17 @@
 import type { Request, Response } from 'express';
-import { AppDataSource } from '../data-source';
-import { Address } from '../entities/address.entity';
-import { EmailVerificationToken } from '../entities/email-verification-token.entity';
-import { UserPreference } from '../entities/user-preference.entity';
-import { UserProfile } from '../entities/user-profile.entity';
-import { User } from '../entities/user.entity';
+import { AppDataSource } from '../../../database/data-source';
+import { Address } from '../../../database/entities/address.entity';
+import { EmailVerificationToken } from '../../../database/entities/email-verification-token.entity';
+import { UserPreference } from '../../../database/entities/user-preference.entity';
+import { UserProfile } from '../../../database/entities/user-profile.entity';
+import { User } from '../../../database/entities/user.entity';
 import {
   addressCreateSchema,
   addressUpdateSchema,
   updateMeSchema,
 } from '../schemas/user.schema';
 import crypto from 'crypto';
-import { EmailService } from '../services/email.service';
+import { EmailService } from '../../../common/services/email.service';
 import { ConfigService } from '@nestjs/config';
 
 let dataSourceInit: Promise<void> | null = null;
