@@ -3,7 +3,7 @@ import type {
   PathItemObject,
   PathsObject,
   SchemaObject,
-} from '@nestjs/swagger';
+} from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 
 const bearerSecurity = [{ bearer: [] }];
 
@@ -912,7 +912,9 @@ const extraPaths: PathsObject = {
   },
 };
 
-const httpMethods: Array<keyof PathItemObject> = [
+type HttpMethod = keyof Pick<PathItemObject, 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options' | 'head' | 'trace'>;
+
+const httpMethods: HttpMethod[] = [
   'get',
   'post',
   'put',
@@ -926,17 +928,18 @@ const httpMethods: Array<keyof PathItemObject> = [
 function mergePaths(base: PathsObject, overrides: PathsObject): PathsObject {
   const merged: PathsObject = { ...base };
 
-  for (const [path, override] of Object.entries(overrides)) {
-    const existing = merged[path] ?? {};
+  for (const [path, rawOverride] of Object.entries(overrides)) {
+    const override = rawOverride as PathItemObject;
+    const existing = (merged[path] ?? {}) as PathItemObject;
     const next: PathItemObject = { ...existing, ...override };
 
     for (const method of httpMethods) {
-      if (override[method]) {
+      if (override?.[method]) {
         next[method] = override[method];
       }
     }
 
-    if (override.parameters) {
+    if (override?.parameters) {
       next.parameters = override.parameters;
     }
 
@@ -962,3 +965,6 @@ export function applySwaggerExtras(document: OpenAPIObject): OpenAPIObject {
     },
   };
 }
+
+
+

@@ -63,6 +63,7 @@ import { EmailModule } from './modules/email/email.module';
                 database: readString('DB_DATABASE'),
               }),
           ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+          extra: useSsl ? { ssl: { rejectUnauthorized: false } } : undefined,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: nodeEnv === 'development',
           logging: nodeEnv === 'development',
@@ -92,3 +93,4 @@ export class AppModule implements NestModule {
       .forRoutes({ path: '*path', method: RequestMethod.ALL });
   }
 }
+
