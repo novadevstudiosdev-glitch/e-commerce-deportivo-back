@@ -31,6 +31,26 @@
 $ npm install
 ```
 
+## Environment variables
+
+Create a `.env` file with at least:
+
+```bash
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-secret-key
+JWT_EXPIRATION=7d
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+FRONTEND_URL=http://localhost:3000
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-user
+SMTP_PASS=your-pass
+EMAIL_FROM=no-reply@example.com
+EMAIL_FLOW_ENABLED=false
+```
+
 ## Compile and run the project
 
 ```bash

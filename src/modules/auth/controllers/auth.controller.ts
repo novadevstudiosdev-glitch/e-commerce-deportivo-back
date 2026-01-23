@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import { AppDataSource } from '../data-source';
-import { User } from '../entities/user.entity';
-import { UserProfile } from '../entities/user-profile.entity';
+import { AppDataSource } from '../../../database/data-source';
+import { User } from '../../../database/entities/user.entity';
+import { UserProfile } from '../../../database/entities/user-profile.entity';
 import { registerSchema } from '../schemas/auth.schema';
 
 let dataSourceInit: Promise<void> | null = null;

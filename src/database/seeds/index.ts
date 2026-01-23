@@ -49,7 +49,7 @@ export async function runAllSeeds(dataSource: DataSource): Promise<void> {
 
 // Script para ejecutar desde CLI
 if (require.main === module) {
-  import('../../data-source.js').then(async ({ AppDataSource }) => {
+  import('../data-source.js').then(async ({ AppDataSource }) => {
     try {
       await AppDataSource.initialize();
       console.log('✅ Database connection established');

@@ -5,6 +5,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import emailConfig from './config/email.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -25,6 +26,7 @@ import { EmailModule } from './modules/email/email.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      load: [emailConfig],
     }),
 
     // Database
@@ -61,6 +63,7 @@ import { EmailModule } from './modules/email/email.module';
                 database: readString('DB_DATABASE'),
               }),
           ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+          extra: useSsl ? { ssl: { rejectUnauthorized: false } } : undefined,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: nodeEnv === 'development',
           logging: nodeEnv === 'development',
@@ -90,3 +93,4 @@ export class AppModule implements NestModule {
       .forRoutes({ path: '*path', method: RequestMethod.ALL });
   }
 }
+
