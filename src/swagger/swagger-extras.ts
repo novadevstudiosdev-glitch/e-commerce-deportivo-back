@@ -40,9 +40,6 @@ const schemas: Record<string, SchemaObject> = {
       details: 'email: Invalid email',
     },
   },
-    },
-    required: ['error'],
-  },
   OkResponse: {
     type: 'object',
     properties: {
@@ -383,7 +380,7 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['product', 'quantity', 'subtotal'],
   },
-    CartResponse: {
+  CartResponse: {
     type: 'object',
     properties: {
       items: { type: 'array', items: ref('CartItemResponse') },
@@ -408,10 +405,6 @@ const schemas: Record<string, SchemaObject> = {
       ],
       total: '199.99',
     },
-  },
-      total: { type: 'string' },
-    },
-    required: ['items', 'total'],
   },
   CreateOrderRequest: {
     allOf: [ref('OrderCreateRequest')],
@@ -527,32 +520,10 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['id', 'status', 'total', 'items', 'payment'],
   },
-  OrderFrom  CartResponse: {
+  OrderFromCartResponse: {
     type: 'object',
     properties: {
-      items: { type: 'array', items: ref('CartItemResponse') },
-      total: { type: 'string' },
-    },
-    required: ['items', 'total'],
-    example: {
-      items: [
-        {
-          product: {
-            id: '0f3d7b3a-1c2e-4f4b-8e9c-3f5d6a7b8c9d',
-            name: 'Zapatillas Runner',
-            price: '199.99',
-            currency: 'ARS',
-            stock: 12,
-            images: ['https://example.com/img.jpg'],
-            category: 'running',
-          },
-          quantity: 1,
-          subtotal: '199.99',
-        },
-      ],
-      total: '199.99',
-    },
-  },
+      orderId: { type: 'string', format: 'uuid' },
       status: { type: 'string' },
       total: { type: 'string' },
       items: { type: 'array', items: ref('OrderItemResponse') },
