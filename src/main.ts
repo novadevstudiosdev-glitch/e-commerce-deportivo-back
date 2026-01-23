@@ -11,6 +11,8 @@ import userRoutes from './modules/users/routes/user.routes';
 import adminProductRoutes from './modules/products/routes/admin.product.routes';
 import productRoutes from './modules/products/routes/product.routes';
 import orderRoutes from './modules/orders/routes/order.routes';
+import cartRoutes from './modules/cart/routes/cart.routes';
+import userOrderRoutes from './modules/orders/routes/user.orders.routes';
 import adminOrderRoutes from './modules/orders/routes/admin.order.routes';
 
 async function bootstrap() {
@@ -44,6 +46,7 @@ async function bootstrap() {
   expressApp.use('/api', userRoutes);
   expressApp.use('/api/admin/products', adminProductRoutes);
   expressApp.use('/api', productRoutes);
+  expressApp.use('/api', userOrderRoutes);
   expressApp.use(orderRoutes);
   expressApp.use('/admin/orders', adminOrderRoutes);
 
@@ -74,6 +77,7 @@ async function bootstrap() {
     .addTag('users', 'User management')
     .addTag('products', 'Product catalog')
     .addTag('orders', 'Order management')
+    .addTag('cart', 'Cart operations')
     .addTag('admin', 'Admin operations')
     .addTag('system', 'System utilities')
     .addTag('notifications', 'Notifications')
@@ -94,3 +98,7 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+
+
+
