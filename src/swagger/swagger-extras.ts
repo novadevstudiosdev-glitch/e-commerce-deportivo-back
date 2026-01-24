@@ -950,7 +950,8 @@ const extraPaths: PathsObject = {
     get: {
       tags: ['cart'],
       summary: 'Get current cart',
-      security: bearerSecurity,
+      description:
+        'Returns the current cart for authenticated users or guest carts tracked via the cart_session cookie.',
       responses: {
         '200': jsonResponse(ref('CartResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
@@ -959,7 +960,8 @@ const extraPaths: PathsObject = {
     delete: {
       tags: ['cart'],
       summary: 'Clear cart',
-      security: bearerSecurity,
+      description:
+        'Clears the current cart for authenticated users or guest carts tracked via the cart_session cookie.',
       responses: {
         '200': jsonResponse(ref('OkResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
@@ -970,7 +972,8 @@ const extraPaths: PathsObject = {
     post: {
       tags: ['cart'],
       summary: 'Add item to cart',
-      security: bearerSecurity,
+      description:
+        'Adds an item to the cart for authenticated users or guest carts tracked via the cart_session cookie.',
       requestBody: {
         required: true,
         content: {
@@ -999,7 +1002,8 @@ const extraPaths: PathsObject = {
     put: {
       tags: ['cart'],
       summary: 'Update cart item quantity',
-      security: bearerSecurity,
+      description:
+        'Updates an item for authenticated users or guest carts tracked via the cart_session cookie.',
       parameters: [
         { name: 'productId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
       ],
@@ -1026,7 +1030,8 @@ const extraPaths: PathsObject = {
     delete: {
       tags: ['cart'],
       summary: 'Remove item from cart',
-      security: bearerSecurity,
+      description:
+        'Removes an item for authenticated users or guest carts tracked via the cart_session cookie.',
       parameters: [
         { name: 'productId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
       ],

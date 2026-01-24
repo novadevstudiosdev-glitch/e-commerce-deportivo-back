@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../../auth/middlewares/auth.middleware';
+import { optionalAuth } from '../../auth/middlewares/auth.middleware';
 import {
   addCartItem,
   clearCart,
@@ -10,10 +10,10 @@ import {
 
 const router = Router();
 
-router.get('/cart', requireAuth, getCart);
-router.post('/cart/items', requireAuth, addCartItem);
-router.put('/cart/items/:productId', requireAuth, updateCartItem);
-router.delete('/cart/items/:productId', requireAuth, deleteCartItem);
-router.delete('/cart', requireAuth, clearCart);
+router.get('/cart', optionalAuth, getCart);
+router.post('/cart/items', optionalAuth, addCartItem);
+router.put('/cart/items/:productId', optionalAuth, updateCartItem);
+router.delete('/cart/items/:productId', optionalAuth, deleteCartItem);
+router.delete('/cart', optionalAuth, clearCart);
 
 export default router;

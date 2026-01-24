@@ -4,6 +4,11 @@ import { Cart } from '../../../database/entities/Cart';
 import { CartItem } from '../../../database/entities/CartItem';
 import { Product } from '../../../database/entities/Product';
 import {
+  createCartSessionId,
+  getCartSessionId,
+  setCartSessionCookie,
+} from '../../../common/utils/cart-session';
+import {
   cartItemSchema,
   cartItemUpdateSchema,
   cartProductIdParamSchema,
@@ -27,29 +32,55 @@ function formatMoney(value: number) {
   return value.toFixed(2);
 }
 
-async function getOrCreateCart(userId: string) {
+async function getOrCreateCart(userId?: string, sessionId?: string) {
   const cartRepo = AppDataSource.getRepository(Cart);
-  let cart = await cartRepo.findOne({ where: { userId } });
+  let cart = await cartRepo.findOne({
+    where: userId ? { userId } : { sessionId },
+  });
 
   if (!cart) {
-    cart = cartRepo.create({ userId });
+    cart = cartRepo.create({
+      userId: userId ?? null,
+      sessionId: sessionId ?? null,
+    });
     cart = await cartRepo.save(cart);
   }
 
   return cart;
 }
 
+function resolveSessionId(req: Request, res?: Response, createIfMissing = false) {
+  const sessionId = getCartSessionId(req);
+  if (sessionId || !createIfMissing) {
+    return sessionId;
+  }
+
+  const newSessionId = createCartSessionId();
+  if (res) {
+    setCartSessionCookie(res, newSessionId);
+  }
+  return newSessionId;
+}
+
 export async function getCart(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const sessionId = userId ? null : resolveSessionId(req);
 
   await ensureDataSource();
 
+  const where = userId
+    ? { userId }
+    : sessionId
+      ? { sessionId }
+      : undefined;
+
+  if (!where) {
+    return res.json({ items: [], total: formatMoney(0) });
+  }
+
   const cartRepo = AppDataSource.getRepository(Cart);
   const cart = await cartRepo.findOne({
-    where: { userId },
+    where,
     relations: { items: { product: true } },
   });
 
@@ -85,9 +116,6 @@ export async function getCart(req: Request, res: Response) {
 
 export async function addCartItem(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   const parsed = cartItemSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -110,7 +138,8 @@ export async function addCartItem(req: Request, res: Response) {
     return res.status(400).json({ error: 'Product inactive' });
   }
 
-  const cart = await getOrCreateCart(userId);
+  const sessionId = userId ? null : resolveSessionId(req, res, true);
+  const cart = await getOrCreateCart(userId, sessionId ?? undefined);
   const itemRepo = AppDataSource.getRepository(CartItem);
   let item = await itemRepo.findOne({ where: { cartId: cart.id, productId } });
 
@@ -127,9 +156,6 @@ export async function addCartItem(req: Request, res: Response) {
 
 export async function updateCartItem(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   const paramsParsed = cartProductIdParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
@@ -148,32 +174,37 @@ export async function updateCartItem(req: Request, res: Response) {
   await ensureDataSource();
 
   const cartRepo = AppDataSource.getRepository(Cart);
-  const cart = await cartRepo.findOne({ where: { userId } });
+  if (!userId) {
+    const sessionId = resolveSessionId(req);
+    if (!sessionId) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    const sessionCart = await cartRepo.findOne({ where: { sessionId } });
+    if (!sessionCart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    return updateItemInCart(
+      sessionCart.id,
+      paramsParsed.data.productId,
+      parsed.data.quantity,
+      res,
+    );
+  }
 
+  const cart = await cartRepo.findOne({ where: { userId } });
   if (!cart) {
     return res.status(404).json({ error: 'Cart not found' });
   }
-
-  const itemRepo = AppDataSource.getRepository(CartItem);
-  const item = await itemRepo.findOne({
-    where: { cartId: cart.id, productId: paramsParsed.data.productId },
-  });
-
-  if (!item) {
-    return res.status(404).json({ error: 'Cart item not found' });
-  }
-
-  item.quantity = parsed.data.quantity;
-  await itemRepo.save(item);
-
-  return res.json({ ok: true });
+  return updateItemInCart(
+    cart.id,
+    paramsParsed.data.productId,
+    parsed.data.quantity,
+    res,
+  );
 }
 
 export async function deleteCartItem(req: Request, res: Response) {
   const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   const paramsParsed = cartProductIdParamSchema.safeParse(req.params);
   if (!paramsParsed.success) {
@@ -185,42 +216,92 @@ export async function deleteCartItem(req: Request, res: Response) {
   await ensureDataSource();
 
   const cartRepo = AppDataSource.getRepository(Cart);
-  const cart = await cartRepo.findOne({ where: { userId } });
+  if (!userId) {
+    const sessionId = resolveSessionId(req);
+    if (!sessionId) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    const sessionCart = await cartRepo.findOne({ where: { sessionId } });
+    if (!sessionCart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    return deleteItemFromCart(
+      sessionCart.id,
+      paramsParsed.data.productId,
+      res,
+    );
+  }
 
+  const cart = await cartRepo.findOne({ where: { userId } });
   if (!cart) {
     return res.status(404).json({ error: 'Cart not found' });
   }
+  return deleteItemFromCart(cart.id, paramsParsed.data.productId, res);
+}
 
+export async function clearCart(req: Request, res: Response) {
+  const userId = req.user?.id;
+
+  await ensureDataSource();
+
+  const cartRepo = AppDataSource.getRepository(Cart);
+  if (!userId) {
+    const sessionId = resolveSessionId(req);
+    if (!sessionId) {
+      return res.json({ ok: true });
+    }
+    const sessionCart = await cartRepo.findOne({ where: { sessionId } });
+    if (!sessionCart) {
+      return res.json({ ok: true });
+    }
+    await AppDataSource.getRepository(CartItem).delete({
+      cartId: sessionCart.id,
+    });
+    return res.json({ ok: true });
+  }
+
+  const cart = await cartRepo.findOne({ where: { userId } });
+  if (!cart) {
+    return res.json({ ok: true });
+  }
+
+  await AppDataSource.getRepository(CartItem).delete({ cartId: cart.id });
+
+  return res.json({ ok: true });
+}
+
+async function updateItemInCart(
+  cartId: string,
+  productId: string,
+  quantity: number,
+  res: Response,
+) {
   const itemRepo = AppDataSource.getRepository(CartItem);
-  const item = await itemRepo.findOne({
-    where: { cartId: cart.id, productId: paramsParsed.data.productId },
-  });
+  const item = await itemRepo.findOne({ where: { cartId, productId } });
+
+  if (!item) {
+    return res.status(404).json({ error: 'Cart item not found' });
+  }
+
+  item.quantity = quantity;
+  await itemRepo.save(item);
+
+  return res.json({ ok: true });
+}
+
+async function deleteItemFromCart(
+  cartId: string,
+  productId: string,
+  res: Response,
+) {
+  const itemRepo = AppDataSource.getRepository(CartItem);
+  const item = await itemRepo.findOne({ where: { cartId, productId } });
 
   if (!item) {
     return res.status(404).json({ error: 'Cart item not found' });
   }
 
   await itemRepo.remove(item);
-
-  return res.json({ ok: true });
-}
-
-export async function clearCart(req: Request, res: Response) {
-  const userId = req.user?.id;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  await ensureDataSource();
-
-  const cartRepo = AppDataSource.getRepository(Cart);
-  const cart = await cartRepo.findOne({ where: { userId } });
-
-  if (!cart) {
-    return res.json({ ok: true });
-  }
-
-  await AppDataSource.getRepository(CartItem).delete({ cartId: cart.id });
 
   return res.json({ ok: true });
 }
