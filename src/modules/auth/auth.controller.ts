@@ -47,6 +47,12 @@ import {
   RegisterResponseDto,
 } from './dto/register.dto';
 import { GoogleProfilePayload } from '../../config/passport';
+import { Cart } from '../../database/entities/Cart';
+import { CartItem } from '../../database/entities/CartItem';
+import {
+  clearCartSessionCookie,
+  getCartSessionId,
+} from '../../common/utils/cart-session';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -149,6 +155,14 @@ export class AuthController {
 
         try {
           const user = await this.findOrCreateGoogleUser(payload);
+          try {
+            const merged = await this.mergeGuestCart(req, user.id);
+            if (merged) {
+              clearCartSessionCookie(res);
+            }
+          } catch (error) {
+            console.warn('[Auth] Failed to merge guest cart', error);
+          }
           const { accessToken } = await this.authService.signAccessToken(user);
           const redirectUrl = `${frontendUrl}/auth/callback?token=${encodeURIComponent(
             accessToken,
@@ -173,7 +187,10 @@ export class AuthController {
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiBadRequestResponse({ description: 'Validation error' })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
-  async login(@Req() req: Request): Promise<LoginResponseDto> {
+  async login(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponseDto> {
     const parsed = loginSchema.safeParse(req.body);
 
     if (!parsed.success) {
@@ -196,6 +213,15 @@ export class AuthController {
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    try {
+      const merged = await this.mergeGuestCart(req, user.id);
+      if (merged) {
+        clearCartSessionCookie(res);
+      }
+    } catch (error) {
+      console.warn('[Auth] Failed to merge guest cart', error);
     }
 
     const { accessToken, expiresIn } =
@@ -498,6 +524,62 @@ export class AuthController {
       subject: 'Reset your password',
       text: `Reset your password: ${link}`,
     });
+  }
+
+  private async mergeGuestCart(req: Request, userId: string) {
+    const sessionId = getCartSessionId(req);
+    if (!sessionId) {
+      return false;
+    }
+
+    await this.userRepository.manager.transaction(async (manager) => {
+      const cartRepo = manager.getRepository(Cart);
+      const itemRepo = manager.getRepository(CartItem);
+
+      const guestCart = await cartRepo.findOne({
+        where: { sessionId },
+        relations: { items: true },
+      });
+
+      if (!guestCart) {
+        return;
+      }
+
+      const userCart = await cartRepo.findOne({
+        where: { userId },
+        relations: { items: true },
+      });
+
+      if (!userCart) {
+        guestCart.userId = userId;
+        guestCart.sessionId = null;
+        await cartRepo.save(guestCart);
+        return;
+      }
+
+      const existingByProduct = new Map(
+        (userCart.items ?? []).map((item) => [item.productId, item]),
+      );
+
+      for (const guestItem of guestCart.items ?? []) {
+        const existing = existingByProduct.get(guestItem.productId);
+        if (existing) {
+          existing.quantity += guestItem.quantity;
+          await itemRepo.save(existing);
+        } else {
+          const newItem = itemRepo.create({
+            cartId: userCart.id,
+            productId: guestItem.productId,
+            quantity: guestItem.quantity,
+          });
+          await itemRepo.save(newItem);
+        }
+      }
+
+      await cartRepo.delete({ id: guestCart.id });
+    });
+
+    return true;
   }
 
   private async findOrCreateGoogleUser(payload: GoogleProfilePayload) {

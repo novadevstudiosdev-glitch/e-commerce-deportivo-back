@@ -62,6 +62,41 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req.headers.authorization);
+
+  if (!token) {
+    return next();
+  }
+
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    return res.status(500).json({ error: 'JWT_SECRET is not configured' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, secret) as JwtPayload;
+
+    if (!decoded?.sub || !decoded.role) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (decoded.role !== 'customer' && decoded.role !== 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    req.user = {
+      id: decoded.sub,
+      role: decoded.role,
+    };
+
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+
 export function requireRole(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const continueWithRoleCheck = () => {
