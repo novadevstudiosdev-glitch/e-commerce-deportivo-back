@@ -12,3 +12,7 @@ export const cartItemUpdateSchema = z.object({
 export const cartProductIdParamSchema = z.object({
   productId: z.string().uuid({ message: 'Invalid productId' }),
 });
+
+export const cartCouponSchema = z.object({
+  code: z.string().trim().min(3, { message: 'Coupon code is required' }),
+});

@@ -8,4 +8,5 @@ const orderItemSchema = z.object({
 export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, { message: 'Items cannot be empty' }),
   notes: z.string().optional(),
+  coupon_code: z.string().trim().min(3).optional(),
 });

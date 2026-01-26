@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import express from 'express';
 import passport from 'passport';
 import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
@@ -14,6 +15,7 @@ import orderRoutes from './modules/orders/routes/order.routes';
 import cartRoutes from './modules/cart/routes/cart.routes';
 import userOrderRoutes from './modules/orders/routes/user.orders.routes';
 import adminOrderRoutes from './modules/orders/routes/admin.order.routes';
+import paymentRoutes from './modules/payments/routes/payment.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -26,6 +28,8 @@ async function bootstrap() {
 
   // Minimal callback page for OAuth tests (no frontend required).
   const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use(express.json());
+  expressApp.use(express.urlencoded({ extended: true }));
   expressApp.get('/auth/callback', (req: Request, res: Response) => {
     const token = req.query.token;
     const error = req.query.error;
@@ -46,7 +50,9 @@ async function bootstrap() {
   expressApp.use('/api', userRoutes);
   expressApp.use('/api/admin/products', adminProductRoutes);
   expressApp.use('/api', productRoutes);
+  expressApp.use('/api', cartRoutes);
   expressApp.use('/api', userOrderRoutes);
+  expressApp.use('/api', paymentRoutes);
   expressApp.use(orderRoutes);
   expressApp.use('/admin/orders', adminOrderRoutes);
 
@@ -78,6 +84,7 @@ async function bootstrap() {
     .addTag('products', 'Product catalog')
     .addTag('orders', 'Order management')
     .addTag('cart', 'Cart operations')
+    .addTag('payments', 'Payment operations')
     .addTag('admin', 'Admin operations')
     .addTag('system', 'System utilities')
     .addTag('notifications', 'Notifications')

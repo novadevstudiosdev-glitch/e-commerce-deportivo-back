@@ -31,12 +31,13 @@ const schemas: Record<string, SchemaObject> = {
   ErrorResponse: {
     type: 'object',
     properties: {
+      error: { type: 'string' },
       message: { type: 'string' },
       details: { type: 'string', nullable: true },
+      statusCode: { type: 'integer' },
     },
-    required: ['message'],
     example: {
-      message: 'Validation error',
+      error: 'Validation error',
       details: 'email: Invalid email',
     },
   },
@@ -97,7 +98,7 @@ const schemas: Record<string, SchemaObject> = {
     properties: {
       access_token: { type: 'string' },
       token_type: { type: 'string', example: 'Bearer' },
-      expires_in: { type: 'number', example: 604800 },
+      expires_in: { type: 'string', example: '7d' },
     },
     required: ['access_token', 'token_type', 'expires_in'],
   },
@@ -258,6 +259,7 @@ const schemas: Record<string, SchemaObject> = {
       price: { type: 'string' },
       currency: { type: 'string' },
       stock: { type: 'integer' },
+      discount_percent: { type: 'integer' },
       category: { type: 'string' },
       images: {
         type: 'array',
@@ -274,6 +276,7 @@ const schemas: Record<string, SchemaObject> = {
       'price',
       'currency',
       'stock',
+      'discount_percent',
       'category',
       'is_featured',
       'created_at',
@@ -288,6 +291,8 @@ const schemas: Record<string, SchemaObject> = {
       price: { type: 'string' },
       currency: { type: 'string' },
       stock: { type: 'integer' },
+      discount_percent: { type: 'integer' },
+      low_stock_threshold: { type: 'integer' },
       category: { type: 'string' },
       images: {
         type: 'array',
@@ -306,7 +311,9 @@ const schemas: Record<string, SchemaObject> = {
       'price',
       'currency',
       'stock',
+      'discount_percent',
       'category',
+      'low_stock_threshold',
       'is_active',
       'is_featured',
       'created_at',
@@ -321,6 +328,8 @@ const schemas: Record<string, SchemaObject> = {
       price: { type: 'string' },
       currency: { type: 'string', minLength: 3, maxLength: 3 },
       stock: { type: 'integer', minimum: 0 },
+      discount_percent: { type: 'integer', minimum: 0, maximum: 100 },
+      low_stock_threshold: { type: 'integer', minimum: 0 },
       category: { type: 'string', minLength: 2 },
       images: { type: 'array', items: { type: 'string', format: 'uri' } },
       is_active: { type: 'boolean' },
@@ -336,6 +345,8 @@ const schemas: Record<string, SchemaObject> = {
       price: { type: 'string' },
       currency: { type: 'string', minLength: 3, maxLength: 3 },
       stock: { type: 'integer', minimum: 0 },
+      discount_percent: { type: 'integer', minimum: 0, maximum: 100 },
+      low_stock_threshold: { type: 'integer', minimum: 0 },
       category: { type: 'string', minLength: 2 },
       images: { type: 'array', items: { type: 'string', format: 'uri' } },
       is_active: { type: 'boolean' },
@@ -366,10 +377,11 @@ const schemas: Record<string, SchemaObject> = {
       price: { type: 'string' },
       currency: { type: 'string' },
       stock: { type: 'integer' },
+      discount_percent: { type: 'integer' },
       images: { type: 'array', items: { type: 'string', format: 'uri' }, nullable: true },
       category: { type: 'string' },
     },
-    required: ['id', 'name', 'price', 'currency', 'stock', 'category'],
+    required: ['id', 'name', 'price', 'currency', 'stock', 'discount_percent', 'category'],
   },
   CartItemResponse: {
     type: 'object',
@@ -377,16 +389,29 @@ const schemas: Record<string, SchemaObject> = {
       product: ref('CartProduct'),
       quantity: { type: 'integer' },
       subtotal: { type: 'string' },
+      unit_price: { type: 'string' },
+      discounted_unit_price: { type: 'string' },
     },
-    required: ['product', 'quantity', 'subtotal'],
+    required: ['product', 'quantity', 'subtotal', 'unit_price', 'discounted_unit_price'],
   },
   CartResponse: {
     type: 'object',
     properties: {
       items: { type: 'array', items: ref('CartItemResponse') },
+      subtotal: { type: 'string' },
+      discount_total: { type: 'string' },
       total: { type: 'string' },
+      coupon: {
+        nullable: true,
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          type: { type: 'string', enum: ['percent', 'fixed'] },
+          value: { type: 'string' },
+        },
+      },
     },
-    required: ['items', 'total'],
+    required: ['items', 'subtotal', 'discount_total', 'total', 'coupon'],
     example: {
       items: [
         {
@@ -396,14 +421,20 @@ const schemas: Record<string, SchemaObject> = {
             price: '199.99',
             currency: 'ARS',
             stock: 12,
+            discount_percent: 10,
             images: ['https://example.com/img.jpg'],
             category: 'running',
           },
           quantity: 1,
-          subtotal: '199.99',
+          subtotal: '179.99',
+          unit_price: '199.99',
+          discounted_unit_price: '179.99',
         },
       ],
-      total: '199.99',
+      subtotal: '199.99',
+      discount_total: '38.00',
+      total: '161.99',
+      coupon: { code: 'WELCOME10', type: 'percent', value: '10.00' },
     },
   },
   CreateOrderRequest: {
@@ -430,7 +461,7 @@ const schemas: Record<string, SchemaObject> = {
           transaction_id: { type: 'string', nullable: true },
         },
       },
-      items: { type: 'array', items: ref('OrderItemResponse') },
+      items: { type: 'array', items: ref('OrderItemDetailResponse') },
     },
     required: ['id', 'status', 'subtotal', 'total', 'currency', 'created_at', 'items'],
   },
@@ -483,6 +514,7 @@ const schemas: Record<string, SchemaObject> = {
     properties: {
       items: { type: 'array', items: ref('OrderItemRequest') },
       notes: { type: 'string' },
+      coupon_code: { type: 'string' },
     },
     required: ['items'],
   },
@@ -503,11 +535,29 @@ const schemas: Record<string, SchemaObject> = {
       'subtotal',
     ],
   },
+  OrderItemDetailResponse: {
+    type: 'object',
+    properties: {
+      product_id: { type: 'string', format: 'uuid' },
+      product_name: { type: 'string' },
+      unit_price: { type: 'string' },
+      quantity: { type: 'integer' },
+      subtotal: { type: 'string' },
+    },
+    required: [
+      'product_id',
+      'product_name',
+      'unit_price',
+      'quantity',
+      'subtotal',
+    ],
+  },
   OrderCreateResponse: {
     type: 'object',
     properties: {
       id: { type: 'string', format: 'uuid' },
       status: { type: 'string' },
+      discount_total: { type: 'string' },
       total: { type: 'string' },
       items: { type: 'array', items: ref('OrderItemResponse') },
       payment: {
@@ -518,13 +568,14 @@ const schemas: Record<string, SchemaObject> = {
         required: ['status'],
       },
     },
-    required: ['id', 'status', 'total', 'items', 'payment'],
+    required: ['id', 'status', 'discount_total', 'total', 'items', 'payment'],
   },
   OrderFromCartResponse: {
     type: 'object',
     properties: {
       orderId: { type: 'string', format: 'uuid' },
       status: { type: 'string' },
+      discount_total: { type: 'string' },
       total: { type: 'string' },
       items: { type: 'array', items: ref('OrderItemResponse') },
       payment: {
@@ -535,10 +586,11 @@ const schemas: Record<string, SchemaObject> = {
         required: ['status'],
       },
     },
-    required: ['orderId', 'status', 'total', 'items', 'payment'],
+    required: ['orderId', 'status', 'discount_total', 'total', 'items', 'payment'],
     example: {
       orderId: '2f1a4d7e-9c0d-4b6a-8d9e-5a3e0a1b2c3d',
       status: 'pendiente_pago',
+      discount_total: '0.00',
       total: '199.99',
       items: [
         {
@@ -562,6 +614,24 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['status'],
   },
+  OrderStatusUpdateRequest: {
+    type: 'object',
+    properties: {
+      status: {
+        type: 'string',
+        enum: ['en_preparacion', 'enviado', 'entregado'],
+      },
+    },
+    required: ['status'],
+  },
+  OrderStatusResponse: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+      orderStatus: { type: 'string' },
+    },
+    required: ['orderId', 'orderStatus'],
+  },
   PaymentStatusResponse: {
     type: 'object',
     properties: {
@@ -570,6 +640,159 @@ const schemas: Record<string, SchemaObject> = {
       paymentStatus: { type: 'string' },
     },
     required: ['orderId', 'orderStatus', 'paymentStatus'],
+  },
+  MercadoPagoPreferenceRequest: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+    },
+    required: ['orderId'],
+  },
+  MercadoPagoPreferenceResponse: {
+    type: 'object',
+    properties: {
+      preferenceId: { type: 'string' },
+      initPoint: { type: 'string', nullable: true },
+      sandboxInitPoint: { type: 'string', nullable: true },
+    },
+    required: ['preferenceId'],
+  },
+  CartCouponRequest: {
+    type: 'object',
+    properties: {
+      code: { type: 'string', minLength: 3 },
+    },
+    required: ['code'],
+  },
+  Coupon: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      code: { type: 'string' },
+      type: { type: 'string', enum: ['percent', 'fixed'] },
+      value: { type: 'string' },
+      active: { type: 'boolean' },
+      starts_at: { type: 'string', format: 'date-time', nullable: true },
+      ends_at: { type: 'string', format: 'date-time', nullable: true },
+      min_order_total: { type: 'string' },
+      created_at: { type: 'string', format: 'date-time' },
+      updated_at: { type: 'string', format: 'date-time' },
+    },
+    required: ['id', 'code', 'type', 'value', 'active', 'min_order_total', 'created_at', 'updated_at'],
+  },
+  CouponCreateRequest: {
+    type: 'object',
+    properties: {
+      code: { type: 'string', minLength: 3 },
+      type: { type: 'string', enum: ['percent', 'fixed'] },
+      value: { type: 'number', minimum: 0 },
+      active: { type: 'boolean' },
+      starts_at: { type: 'string', format: 'date-time', nullable: true },
+      ends_at: { type: 'string', format: 'date-time', nullable: true },
+      min_order_total: { type: 'number', minimum: 0 },
+    },
+    required: ['code', 'type', 'value'],
+  },
+  CouponUpdateRequest: {
+    type: 'object',
+    properties: {
+      code: { type: 'string', minLength: 3 },
+      type: { type: 'string', enum: ['percent', 'fixed'] },
+      value: { type: 'number', minimum: 0 },
+      active: { type: 'boolean' },
+      starts_at: { type: 'string', format: 'date-time', nullable: true },
+      ends_at: { type: 'string', format: 'date-time', nullable: true },
+      min_order_total: { type: 'number', minimum: 0 },
+    },
+  },
+  CouponsListResponse: {
+    type: 'object',
+    properties: {
+      data: { type: 'array', items: ref('Coupon') },
+    },
+    required: ['data'],
+  },
+  StatsSummaryResponse: {
+    type: 'object',
+    properties: {
+      orders: { type: 'integer' },
+      units: { type: 'integer' },
+      revenue: { type: 'string' },
+      currency: { type: 'string' },
+    },
+    required: ['orders', 'units', 'revenue', 'currency'],
+  },
+  TopProductsResponse: {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            productId: { type: 'string', format: 'uuid' },
+            productName: { type: 'string' },
+            units: { type: 'integer' },
+            revenue: { type: 'string' },
+          },
+          required: ['productId', 'productName', 'units', 'revenue'],
+        },
+      },
+    },
+    required: ['data'],
+  },
+  PaymentAdminItem: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      status: { type: 'string' },
+      provider: { type: 'string' },
+      amount: { type: 'string' },
+      transaction_id: { type: 'string', nullable: true },
+      created_at: { type: 'string', format: 'date-time' },
+      order: {
+        type: 'object',
+        nullable: true,
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          status: { type: 'string' },
+          currency: { type: 'string' },
+          total: { type: 'string' },
+          user_id: { type: 'string', format: 'uuid' },
+        },
+      },
+    },
+    required: ['id', 'status', 'provider', 'amount', 'created_at'],
+  },
+  PaymentsListResponse: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer' },
+      limit: { type: 'integer' },
+      total: { type: 'integer' },
+      data: { type: 'array', items: ref('PaymentAdminItem') },
+    },
+    required: ['page', 'limit', 'total', 'data'],
+  },
+  LowStockResponse: {
+    type: 'object',
+    properties: {
+      data: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            stock: { type: 'integer' },
+            low_stock_threshold: { type: 'integer' },
+            category: { type: 'string' },
+          },
+          required: ['id', 'name', 'stock', 'low_stock_threshold', 'category'],
+        },
+      },
+    },
+    required: ['data'],
   },
 };
 
@@ -946,6 +1169,92 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/api/admin/stats/summary': {
+    get: {
+      tags: ['admin', 'dashboard'],
+      summary: 'Sales summary',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('StatsSummaryResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/stats/top-products': {
+    get: {
+      tags: ['admin', 'dashboard'],
+      summary: 'Top products',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 5 } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('TopProductsResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/payments': {
+    get: {
+      tags: ['admin', 'dashboard'],
+      summary: 'Payments history',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+        { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['pendiente','aprobado','rechazado','reembolsado'] } },
+        { name: 'provider', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['newest','oldest'], default: 'newest' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('PaymentsListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/payments/pending': {
+    get: {
+      tags: ['admin', 'dashboard'],
+      summary: 'Pending payments',
+      security: bearerSecurity,
+      responses: {
+        '200': jsonResponse(ref('PaymentsListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/stock-alerts': {
+    get: {
+      tags: ['admin', 'dashboard'],
+      summary: 'Low stock alerts',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'threshold', in: 'query', required: false, schema: { type: 'integer', minimum: 0 } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('LowStockResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/api/cart': {
     get: {
       tags: ['cart'],
@@ -962,6 +1271,37 @@ const extraPaths: PathsObject = {
       summary: 'Clear cart',
       description:
         'Clears the current cart for authenticated users or guest carts tracked via the cart_session cookie.',
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/cart/coupon': {
+    post: {
+      tags: ['cart'],
+      summary: 'Apply coupon to cart',
+      description:
+        'Applies a coupon code to the current cart for authenticated users or guest carts tracked via the cart_session cookie.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('CartCouponRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('CartResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+    delete: {
+      tags: ['cart'],
+      summary: 'Remove coupon from cart',
+      description:
+        'Removes the coupon from the current cart for authenticated users or guest carts tracked via the cart_session cookie.',
       responses: {
         '200': jsonResponse(ref('OkResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
@@ -995,6 +1335,7 @@ const extraPaths: PathsObject = {
         '400': jsonResponse(ref('ErrorResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -1025,6 +1366,7 @@ const extraPaths: PathsObject = {
         '400': jsonResponse(ref('ErrorResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
     delete: {
@@ -1039,6 +1381,39 @@ const extraPaths: PathsObject = {
         '200': jsonResponse(ref('OkResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/payments/mercadopago/preference': {
+    post: {
+      tags: ['payments'],
+      summary: 'Create Mercado Pago preference',
+      security: bearerSecurity,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('MercadoPagoPreferenceRequest'),
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('MercadoPagoPreferenceResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/payments/mercadopago/webhook': {
+    post: {
+      tags: ['payments'],
+      summary: 'Mercado Pago webhook',
+      description: 'Receives payment notifications from Mercado Pago.',
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -1155,6 +1530,83 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/api/admin/coupons': {
+    get: {
+      tags: ['admin', 'coupons'],
+      summary: 'List coupons',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'active', in: 'query', required: false, schema: { type: 'boolean' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('CouponsListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+    post: {
+      tags: ['admin', 'coupons'],
+      summary: 'Create coupon',
+      security: bearerSecurity,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('CouponCreateRequest'),
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('Coupon')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/coupons/{id}': {
+    put: {
+      tags: ['admin', 'coupons'],
+      summary: 'Update coupon',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('CouponUpdateRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('Coupon')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+    delete: {
+      tags: ['admin', 'coupons'],
+      summary: 'Deactivate coupon',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('Coupon')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/orders/from-cart': {
     post: {
       tags: ['orders'],
@@ -1198,6 +1650,37 @@ const extraPaths: PathsObject = {
         '404': jsonResponse(ref('ErrorResponse')),
         '409': jsonResponse(ref('ErrorResponse')),
         '500': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/admin/orders/{orderId}/status': {
+    patch: {
+      tags: ['admin', 'orders'],
+      summary: 'Update order shipping status',
+      security: bearerSecurity,
+      parameters: [
+        {
+          name: 'orderId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string', format: 'uuid' },
+        },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('OrderStatusUpdateRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('OrderStatusResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
   },

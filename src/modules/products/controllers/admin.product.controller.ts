@@ -38,6 +38,8 @@ function mapProduct(product: Product) {
     price: product.price,
     currency: product.currency,
     stock: product.stock,
+    discount_percent: product.discountPercent,
+    low_stock_threshold: product.lowStockThreshold,
     category: product.category,
     images: product.images,
     is_active: product.isActive,
@@ -68,6 +70,8 @@ export async function createProduct(req: Request, res: Response) {
     price: payload.price,
     currency: payload.currency ?? 'ARS',
     stock: payload.stock ?? 0,
+    discountPercent: payload.discount_percent ?? 0,
+    lowStockThreshold: payload.low_stock_threshold ?? 10,
     category: payload.category,
     images: payload.images ?? null,
     isActive: payload.is_active ?? true,
@@ -139,6 +143,20 @@ export async function updateProductById(req: Request, res: Response) {
       return res.status(400).json({ error: 'Stock must be >= 0' });
     }
     product.stock = payload.stock;
+  }
+  if (payload.discount_percent !== undefined) {
+    if (payload.discount_percent < 0 || payload.discount_percent > 100) {
+      return res
+        .status(400)
+        .json({ error: 'Discount percent must be between 0 and 100' });
+    }
+    product.discountPercent = payload.discount_percent;
+  }
+  if (payload.low_stock_threshold !== undefined) {
+    if (payload.low_stock_threshold < 0) {
+      return res.status(400).json({ error: 'Low stock threshold must be >= 0' });
+    }
+    product.lowStockThreshold = payload.low_stock_threshold;
   }
   if (payload.category !== undefined) {
     product.category = payload.category;

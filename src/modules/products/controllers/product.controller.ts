@@ -87,6 +87,7 @@ export async function listProducts(req: Request, res: Response) {
     price: product.price,
     currency: product.currency,
     stock: product.stock,
+    discount_percent: product.discountPercent,
     category: product.category,
     images: product.images,
     is_featured: product.isFeatured,
