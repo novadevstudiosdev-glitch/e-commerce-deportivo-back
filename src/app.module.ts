@@ -93,4 +93,3 @@ export class AppModule implements NestModule {
       .forRoutes({ path: '*path', method: RequestMethod.ALL });
   }
 }
-

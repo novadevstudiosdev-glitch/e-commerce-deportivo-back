@@ -26,8 +26,14 @@ export class Product {
   @Column({ type: 'varchar', length: 3, default: 'ARS' })
   currency: string;
 
+  @Column({ name: 'discount_percent', type: 'int', default: 0 })
+  discountPercent: number;
+
   @Column({ type: 'int', default: 0 })
   stock: number;
+
+  @Column({ name: 'low_stock_threshold', type: 'int', default: 10 })
+  lowStockThreshold: number;
 
   @Column({ type: 'varchar', length: 80 })
   category: string;

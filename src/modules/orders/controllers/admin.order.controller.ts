@@ -6,6 +6,7 @@ import { Payment } from '../../../database/entities/Payment';
 import { Product } from '../../../database/entities/Product';
 import { ConfigService } from '@nestjs/config';
 import { paymentStatusSchema } from '../schemas/payment.schema';
+import { orderStatusUpdateSchema } from '../schemas/order.status.schema';
 import { EmailService } from '../../../common/services/email.service';
 
 let dataSourceInit: Promise<void> | null = null;
@@ -182,4 +183,51 @@ export async function updatePaymentStatus(req: Request, res: Response) {
   }
 
   return res.status(400).json({ error: 'Invalid status' });
+}
+
+export async function updateOrderStatus(req: Request, res: Response) {
+  const { orderId } = req.params;
+  if (!orderId || Array.isArray(orderId)) {
+    return res.status(400).json({ error: 'Invalid orderId' });
+  }
+
+  const parsed = orderStatusUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.join('.') || 'body';
+    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  }
+
+  await ensureDataSource();
+
+  const orderRepo = AppDataSource.getRepository(Order);
+  const order = await orderRepo.findOne({
+    where: { id: orderId },
+    relations: { payment: true },
+  });
+
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  if (order.status === 'pendiente_pago') {
+    return res.status(409).json({ error: 'Order not paid' });
+  }
+
+  if (!order.payment || order.payment.status !== 'aprobado') {
+    return res.status(409).json({ error: 'Payment not approved' });
+  }
+
+  const { status } = parsed.data;
+  if (order.status === status) {
+    return res.status(409).json({ error: 'Order already in status' });
+  }
+
+  order.status = status;
+  await orderRepo.save(order);
+
+  return res.json({
+    orderId: order.id,
+    orderStatus: order.status,
+  });
 }

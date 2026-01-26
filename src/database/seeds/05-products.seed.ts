@@ -19,15 +19,15 @@ export class ProductsSeed {
     const allProducts = generate250Products();
     const productsToSave = allProducts.map((data) => {
       const discount = data.discount_percentage || 0;
-      const finalPrice = data.base_price * (1 - discount / 100);
       const category = CATEGORY_BY_ID[data.category_id] ?? 'otros';
 
       return productRepo.create({
         name: data.name,
         description: data.description,
-        price: finalPrice.toFixed(2),
+        price: data.base_price.toFixed(2),
         currency: 'ARS',
         stock: data.stock,
+        discountPercent: discount,
         category,
         images: data.images.length > 0 ? data.images : null,
         isActive: true,

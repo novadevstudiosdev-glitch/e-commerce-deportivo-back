@@ -10,6 +10,15 @@ const currencySchema = z
   .default('ARS');
 
 const stockSchema = z.number().int().min(0, { message: 'Stock must be >= 0' });
+const lowStockThresholdSchema = z
+  .number()
+  .int()
+  .min(0, { message: 'Low stock threshold must be >= 0' });
+const discountPercentSchema = z
+  .number()
+  .int()
+  .min(0, { message: 'Discount percent must be >= 0' })
+  .max(100, { message: 'Discount percent must be <= 100' });
 
 const nameSchema = z
   .string()
@@ -38,10 +47,12 @@ export const productCreateSchema = z.object({
   price: priceSchema,
   currency: currencySchema.optional(),
   stock: stockSchema.optional(),
+  discount_percent: discountPercentSchema.optional(),
   category: categorySchema,
   images: imagesSchema,
   is_active: isActiveSchema,
   is_featured: isFeaturedSchema,
+  low_stock_threshold: lowStockThresholdSchema.optional(),
 });
 
 export const productUpdateSchema = productCreateSchema
