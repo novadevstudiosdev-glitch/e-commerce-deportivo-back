@@ -348,24 +348,26 @@ export class AuthController {
 
   @Get('verify-email')
   async verifyEmailLink(@Req() req: Request, @Res() res: Response) {
+    const frontendBase = this.getFrontendUrl().replace(/\/$/, '');
+    const successUrl = `${frontendBase}/?verified=1`;
+    const failureUrl = `${frontendBase}/?verified=0`;
+
     if (!this.isEmailFlowEnabled()) {
-      return res.status(503).send('Email verification disabled');
+      return res.redirect(`${failureUrl}&error=verification_disabled`);
     }
 
     const email = req.query.email;
     const token = req.query.token;
 
     if (typeof email !== 'string' || typeof token !== 'string') {
-      return res.status(400).send('Invalid verification link');
+      return res.redirect(`${failureUrl}&error=invalid_link`);
     }
 
     try {
       await this.completeEmailVerification(email, token);
-      return res
-        .status(200)
-        .send('Email verified. You can close this tab.');
+      return res.redirect(successUrl);
     } catch (error) {
-      return res.status(400).send('Invalid or expired token');
+      return res.redirect(`${failureUrl}&error=invalid_or_expired`);
     }
   }
 
