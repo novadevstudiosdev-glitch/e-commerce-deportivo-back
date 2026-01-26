@@ -79,6 +79,14 @@ export class AuthController {
     return value || 'http://localhost:3000';
   }
 
+  private getBackendUrl() {
+    const value = this.configService.get<string>('BACKEND_URL');
+    const port = this.configService.get<string>('PORT') || '3000';
+    const fallback = `http://localhost:${port}`;
+    const base = value || fallback;
+    return base.endsWith('/') ? base.slice(0, -1) : base;
+  }
+
   private isEmailFlowEnabled() {
     const value = this.configService.get<string>('EMAIL_FLOW_ENABLED');
     return value === 'true';
@@ -215,6 +223,10 @@ export class AuthController {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (this.isEmailFlowEnabled() && !user.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
     try {
       const merged = await this.mergeGuestCart(req, user.id);
       if (merged) {
@@ -327,41 +339,30 @@ export class AuthController {
     }
 
     const { email, token } = parsed.data;
+    return this.completeEmailVerification(email, token);
+  }
 
-    const user = await this.userRepository.findOne({ where: { email } });
-
-    if (!user) {
-      throw new BadRequestException('Invalid or expired token');
+  @Get('verify-email')
+  async verifyEmailLink(@Req() req: Request, @Res() res: Response) {
+    if (!this.isEmailFlowEnabled()) {
+      return res.status(503).send('Email verification disabled');
     }
 
-    if (user.emailVerified) {
-      return { ok: true };
+    const email = req.query.email;
+    const token = req.query.token;
+
+    if (typeof email !== 'string' || typeof token !== 'string') {
+      return res.status(400).send('Invalid verification link');
     }
 
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const now = new Date();
-
-    const verification = await this.emailVerificationTokenRepository.findOne({
-      where: {
-        userId: user.id,
-        tokenHash,
-        usedAt: IsNull(),
-        expiresAt: MoreThan(now),
-      },
-    });
-
-    if (!verification) {
-      throw new BadRequestException('Invalid or expired token');
+    try {
+      await this.completeEmailVerification(email, token);
+      return res
+        .status(200)
+        .send('Email verified. You can close this tab.');
+    } catch (error) {
+      return res.status(400).send('Invalid or expired token');
     }
-
-    await this.userRepository.manager.transaction(async (manager) => {
-      user.emailVerified = true;
-      verification.usedAt = now;
-      await manager.getRepository(User).save(user);
-      await manager.getRepository(EmailVerificationToken).save(verification);
-    });
-
-    return { ok: true };
   }
 
   @Post('resend-verification')
@@ -493,14 +494,31 @@ export class AuthController {
       usedAt: null,
     });
 
-    const link = `${this.getFrontendUrl()}/verify-email?token=${encodeURIComponent(
+    const link = `${this.getBackendUrl()}/api/auth/verify-email?token=${encodeURIComponent(
       token,
     )}&email=${encodeURIComponent(user.email)}`;
 
+    const subject = 'Verifica tu cuenta en SportShop';
+    const text = [
+      'Hola,',
+      'Gracias por registrarte en SportShop.',
+      `Verifica tu cuenta aqui: ${link}`,
+      'Si no creaste esta cuenta, podes ignorar este email.',
+    ].join('\n');
+
+    const html = this.buildEmailHtml({
+      title: 'Verifica tu cuenta',
+      intro: 'Gracias por registrarte en SportShop. Para activar tu cuenta, hace clic en el boton.',
+      buttonText: 'Verificar cuenta',
+      buttonUrl: link,
+      outro: 'Si no creaste esta cuenta, podes ignorar este email.',
+    });
+
     await this.emailService.sendMail({
       to: user.email,
-      subject: 'Verify your email',
-      text: `Verify your email: ${link}`,
+      subject,
+      text,
+      html,
     });
   }
 
@@ -519,11 +537,122 @@ export class AuthController {
       token,
     )}&email=${encodeURIComponent(user.email)}`;
 
+    const subject = 'Recupera tu contrasena en SportShop';
+    const text = [
+      'Hola,',
+      'Recibimos una solicitud para restablecer tu contrasena.',
+      `Cambia tu contrasena aqui: ${link}`,
+      'Si no fuiste vos, podes ignorar este email.',
+    ].join('\n');
+
+    const html = this.buildEmailHtml({
+      title: 'Recupera tu contrasena',
+      intro:
+        'Recibimos una solicitud para restablecer tu contrasena. Si fuiste vos, hace clic en el boton.',
+      buttonText: 'Cambiar contrasena',
+      buttonUrl: link,
+      outro: 'Si no fuiste vos, podes ignorar este email.',
+    });
+
     await this.emailService.sendMail({
       to: user.email,
-      subject: 'Reset your password',
-      text: `Reset your password: ${link}`,
+      subject,
+      text,
+      html,
     });
+  }
+
+  private buildEmailHtml(options: {
+    title: string;
+    intro: string;
+    buttonText: string;
+    buttonUrl: string;
+    outro?: string;
+  }) {
+    const { title, intro, buttonText, buttonUrl, outro } = options;
+    const brand = 'SportShop';
+
+    return `
+      <div style="background-color:#f4f6fb;padding:24px 0;font-family:Arial,sans-serif;color:#111827;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+          <tr>
+            <td align="center" style="padding:0 16px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(17,24,39,0.08);">
+                <tr>
+                  <td style="padding:20px 28px;background:#0ea5e9;color:#ffffff;">
+                    <div style="font-size:18px;font-weight:700;letter-spacing:0.5px;">${brand}</div>
+                    <div style="font-size:12px;opacity:0.9;">Tu tienda deportiva</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:28px;">
+                    <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#0f172a;">${title}</h1>
+                    <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#334155;">${intro}</p>
+                    <div style="margin:24px 0;">
+                      <a href="${buttonUrl}" style="display:inline-block;background:#0ea5e9;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px;">
+                        ${buttonText}
+                      </a>
+                    </div>
+                    <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.6;">
+                      Si el boton no funciona, copia y pega este link en tu navegador:
+                      <br />
+                      <span style="word-break:break-all;color:#0f172a;">${buttonUrl}</span>
+                    </p>
+                    ${
+                      outro
+                        ? `<p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">${outro}</p>`
+                        : ''
+                    }
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 28px;background:#f8fafc;color:#94a3b8;font-size:12px;">
+                    © ${new Date().getFullYear()} ${brand}. Todos los derechos reservados.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
+
+  private async completeEmailVerification(email: string, token: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    if (user.emailVerified) {
+      return { ok: true };
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const now = new Date();
+
+    const verification = await this.emailVerificationTokenRepository.findOne({
+      where: {
+        userId: user.id,
+        tokenHash,
+        usedAt: IsNull(),
+        expiresAt: MoreThan(now),
+      },
+    });
+
+    if (!verification) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    await this.userRepository.manager.transaction(async (manager) => {
+      user.emailVerified = true;
+      verification.usedAt = now;
+      await manager.getRepository(User).save(user);
+      await manager.getRepository(EmailVerificationToken).save(verification);
+    });
+
+    return { ok: true };
   }
 
   private async mergeGuestCart(req: Request, userId: string) {
