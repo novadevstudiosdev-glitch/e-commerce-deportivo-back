@@ -163,6 +163,10 @@ export class AuthController {
 
         try {
           const user = await this.findOrCreateGoogleUser(payload);
+          if (this.isEmailFlowEnabled() && !user.emailVerified) {
+            const redirectUrl = `${frontendUrl}/auth/callback?error=email_not_verified`;
+            return res.redirect(redirectUrl);
+          }
           try {
             const merged = await this.mergeGuestCart(req, user.id);
             if (merged) {
@@ -721,6 +725,8 @@ export class AuthController {
       where: { email },
     });
 
+    const emailFlowEnabled = this.isEmailFlowEnabled();
+
     if (existingUser) {
       if (existingUser.googleId && existingUser.googleId !== googleId) {
         throw new ConflictException('Google account mismatch');
@@ -731,7 +737,15 @@ export class AuthController {
       }
 
       if (!existingUser.emailVerified) {
-        existingUser.emailVerified = true;
+        if (!emailFlowEnabled) {
+          existingUser.emailVerified = true;
+        } else if (this.allowSend(email, 'verify')) {
+          try {
+            await this.issueEmailVerification(existingUser);
+          } catch (error) {
+            console.warn('[Auth] Failed to send verification email');
+          }
+        }
       }
 
       return this.userRepository.save(existingUser);
@@ -743,7 +757,7 @@ export class AuthController {
       password: null,
       role: 'customer',
       isActive: true,
-      emailVerified: true,
+      emailVerified: !emailFlowEnabled,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -756,6 +770,14 @@ export class AuthController {
     });
 
     await this.userProfileRepository.save(profile);
+
+    if (emailFlowEnabled && !savedUser.emailVerified) {
+      try {
+        await this.issueEmailVerification(savedUser);
+      } catch (error) {
+        console.warn('[Auth] Failed to send verification email');
+      }
+    }
 
     return savedUser;
   }
