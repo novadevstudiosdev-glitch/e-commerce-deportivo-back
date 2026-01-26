@@ -31,12 +31,13 @@ const schemas: Record<string, SchemaObject> = {
   ErrorResponse: {
     type: 'object',
     properties: {
+      error: { type: 'string' },
       message: { type: 'string' },
       details: { type: 'string', nullable: true },
+      statusCode: { type: 'integer' },
     },
-    required: ['message'],
     example: {
-      message: 'Validation error',
+      error: 'Validation error',
       details: 'email: Invalid email',
     },
   },
@@ -97,7 +98,7 @@ const schemas: Record<string, SchemaObject> = {
     properties: {
       access_token: { type: 'string' },
       token_type: { type: 'string', example: 'Bearer' },
-      expires_in: { type: 'number', example: 604800 },
+      expires_in: { type: 'string', example: '7d' },
     },
     required: ['access_token', 'token_type', 'expires_in'],
   },
@@ -571,6 +572,22 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['orderId', 'orderStatus', 'paymentStatus'],
   },
+  MercadoPagoPreferenceRequest: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+    },
+    required: ['orderId'],
+  },
+  MercadoPagoPreferenceResponse: {
+    type: 'object',
+    properties: {
+      preferenceId: { type: 'string' },
+      initPoint: { type: 'string', nullable: true },
+      sandboxInitPoint: { type: 'string', nullable: true },
+    },
+    required: ['preferenceId'],
+  },
 };
 
 const extraPaths: PathsObject = {
@@ -995,6 +1012,7 @@ const extraPaths: PathsObject = {
         '400': jsonResponse(ref('ErrorResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -1025,6 +1043,7 @@ const extraPaths: PathsObject = {
         '400': jsonResponse(ref('ErrorResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
     delete: {
@@ -1039,6 +1058,39 @@ const extraPaths: PathsObject = {
         '200': jsonResponse(ref('OkResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/payments/mercadopago/preference': {
+    post: {
+      tags: ['payments'],
+      summary: 'Create Mercado Pago preference',
+      security: bearerSecurity,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('MercadoPagoPreferenceRequest'),
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('MercadoPagoPreferenceResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/payments/mercadopago/webhook': {
+    post: {
+      tags: ['payments'],
+      summary: 'Mercado Pago webhook',
+      description: 'Receives payment notifications from Mercado Pago.',
+      responses: {
+        '200': jsonResponse(ref('OkResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
       },
     },
   },

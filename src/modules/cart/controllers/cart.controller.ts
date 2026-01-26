@@ -49,6 +49,36 @@ async function getOrCreateCart(userId?: string, sessionId?: string) {
   return cart;
 }
 
+async function validateStock(
+  productId: string,
+  desiredQuantity: number,
+): Promise<
+  | { ok: true; product: Product }
+  | { ok: false; status: number; error: string; available?: number }
+> {
+  const productRepo = AppDataSource.getRepository(Product);
+  const product = await productRepo.findOne({ where: { id: productId } });
+
+  if (!product) {
+    return { ok: false, status: 404, error: 'Product not found' };
+  }
+
+  if (!product.isActive) {
+    return { ok: false, status: 400, error: 'Product inactive' };
+  }
+
+  if (product.stock < desiredQuantity) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Insufficient stock',
+      available: product.stock,
+    };
+  }
+
+  return { ok: true, product };
+}
+
 function resolveSessionId(req: Request, res?: Response, createIfMissing = false) {
   const sessionId = getCartSessionId(req);
   if (sessionId || !createIfMissing) {
@@ -126,27 +156,30 @@ export async function addCartItem(req: Request, res: Response) {
 
   await ensureDataSource();
 
-  const { productId, quantity } = parsed.data;
-  const productRepo = AppDataSource.getRepository(Product);
-  const product = await productRepo.findOne({ where: { id: productId } });
-
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
-
-  if (!product.isActive) {
-    return res.status(400).json({ error: 'Product inactive' });
-  }
-
   const sessionId = userId ? null : resolveSessionId(req, res, true);
   const cart = await getOrCreateCart(userId, sessionId ?? undefined);
   const itemRepo = AppDataSource.getRepository(CartItem);
   let item = await itemRepo.findOne({ where: { cartId: cart.id, productId } });
 
+  const desiredQuantity = (item?.quantity ?? 0) + parsed.data.quantity;
+  const stockCheck = await validateStock(productId, desiredQuantity);
+  if (!stockCheck.ok) {
+    return res.status(stockCheck.status).json({
+      error: stockCheck.error,
+      ...(stockCheck.available !== undefined
+        ? { available: stockCheck.available }
+        : {}),
+    });
+  }
+
   if (item) {
-    item.quantity += quantity;
+    item.quantity = desiredQuantity;
   } else {
-    item = itemRepo.create({ cartId: cart.id, productId, quantity });
+    item = itemRepo.create({
+      cartId: cart.id,
+      productId,
+      quantity: desiredQuantity,
+    });
   }
 
   await itemRepo.save(item);
@@ -276,6 +309,16 @@ async function updateItemInCart(
   quantity: number,
   res: Response,
 ) {
+  const stockCheck = await validateStock(productId, quantity);
+  if (!stockCheck.ok) {
+    return res.status(stockCheck.status).json({
+      error: stockCheck.error,
+      ...(stockCheck.available !== undefined
+        ? { available: stockCheck.available }
+        : {}),
+    });
+  }
+
   const itemRepo = AppDataSource.getRepository(CartItem);
   const item = await itemRepo.findOne({ where: { cartId, productId } });
 
