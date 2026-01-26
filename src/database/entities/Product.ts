@@ -9,6 +9,7 @@ import {
 
 @Entity({ name: 'products' })
 @Index(['category'])
+@Index(['target'])
 @Index(['price'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -37,6 +38,9 @@ export class Product {
 
   @Column({ type: 'varchar', length: 80 })
   category: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Hombre' })
+  target: string;
 
   @Column({ type: 'jsonb', nullable: true })
   images: string[] | null;

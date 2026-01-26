@@ -26,7 +26,7 @@ export async function listProducts(req: Request, res: Response) {
     return res.status(400).json({ error: `${field}: ${issue.message}` });
   }
 
-  const { page, limit, q, category, minPrice, maxPrice, inStock, sort } =
+  const { page, limit, q, category, target, minPrice, maxPrice, inStock, sort } =
     parsed.data;
 
   await ensureDataSource();
@@ -44,6 +44,10 @@ export async function listProducts(req: Request, res: Response) {
 
   if (category) {
     qb.andWhere('product.category = :category', { category });
+  }
+
+  if (target) {
+    qb.andWhere('product.target = :target', { target });
   }
 
   if (minPrice !== undefined) {
@@ -89,6 +93,7 @@ export async function listProducts(req: Request, res: Response) {
     stock: product.stock,
     discount_percent: product.discountPercent,
     category: product.category,
+    target: product.target,
     images: product.images,
     is_featured: product.isFeatured,
     created_at: product.createdAt,
