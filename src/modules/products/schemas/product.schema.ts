@@ -30,6 +30,23 @@ const categorySchema = z
   .trim()
   .min(2, { message: 'Category must be at least 2 characters' });
 
+const targetSchema = z
+  .string()
+  .trim()
+  .transform((value) => {
+    const normalized = value.toLowerCase();
+    if (normalized === 'hombre') return 'Hombre';
+    if (normalized === 'mujer') return 'Mujer';
+    if (normalized === 'ni\u00f1o' || normalized === 'nino') return 'Ni\u00f1o';
+    if (normalized === 'accesorio' || normalized === 'accesorios') {
+      return 'Accesorio';
+    }
+    return value;
+  })
+  .refine((value) => ['Hombre', 'Mujer', 'Ni\u00f1o', 'Accesorio'].includes(value), {
+    message: 'Target must be one of Hombre, Mujer, Ni\u00f1o, Accesorio',
+  });
+
 const descriptionSchema = z
   .string()
   .min(10, { message: 'Description must be at least 10 characters' });
@@ -49,6 +66,7 @@ export const productCreateSchema = z.object({
   stock: stockSchema.optional(),
   discount_percent: discountPercentSchema.optional(),
   category: categorySchema,
+  target: targetSchema,
   images: imagesSchema,
   is_active: isActiveSchema,
   is_featured: isFeaturedSchema,

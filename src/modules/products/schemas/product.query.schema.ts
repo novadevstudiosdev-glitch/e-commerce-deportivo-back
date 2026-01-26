@@ -16,6 +16,23 @@ const booleanFromString = (value: unknown) => {
   return value;
 };
 
+const targetSchema = z
+  .string()
+  .trim()
+  .transform((value) => {
+    const normalized = value.toLowerCase();
+    if (normalized === 'hombre') return 'Hombre';
+    if (normalized === 'mujer') return 'Mujer';
+    if (normalized === 'ni\u00f1o' || normalized === 'nino') return 'Ni\u00f1o';
+    if (normalized === 'accesorio' || normalized === 'accesorios') {
+      return 'Accesorio';
+    }
+    return value;
+  })
+  .refine((value) => ['Hombre', 'Mujer', 'Ni\u00f1o', 'Accesorio'].includes(value), {
+    message: 'Target must be one of Hombre, Mujer, Ni\u00f1o, Accesorio',
+  });
+
 export const productQuerySchema = z.object({
   page: z.preprocess(numberFromString, z.number().int().min(1)).default(1),
   limit: z
@@ -23,6 +40,7 @@ export const productQuerySchema = z.object({
     .default(12),
   q: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
+  target: targetSchema.optional(),
   minPrice: z.preprocess(numberFromString, z.number().min(0)).optional(),
   maxPrice: z.preprocess(numberFromString, z.number().min(0)).optional(),
   inStock: z.preprocess(booleanFromString, z.boolean()).optional(),

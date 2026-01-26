@@ -4,7 +4,7 @@ import { Coupon } from '../entities/coupon.entity';
 export class CouponsSeed {
   public async run(dataSource: DataSource): Promise<void> {
     const couponRepo = dataSource.getRepository(Coupon);
-    await couponRepo.clear();
+    await dataSource.query(`TRUNCATE TABLE "coupons" CASCADE`);
 
     console.log('Seeding coupons...');
 

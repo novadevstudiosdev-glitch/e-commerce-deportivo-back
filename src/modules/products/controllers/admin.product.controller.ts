@@ -20,13 +20,14 @@ async function ensureDataSource() {
   await dataSourceInit;
 }
 
-function normalizeProductInput<T extends { name?: string; category?: string }>(
-  data: T,
-) {
+function normalizeProductInput<
+  T extends { name?: string; category?: string; target?: string },
+>(data: T) {
   return {
     ...data,
     name: data.name?.trim(),
     category: data.category?.trim(),
+    target: data.target?.trim(),
   };
 }
 
@@ -41,6 +42,7 @@ function mapProduct(product: Product) {
     discount_percent: product.discountPercent,
     low_stock_threshold: product.lowStockThreshold,
     category: product.category,
+    target: product.target,
     images: product.images,
     is_active: product.isActive,
     is_featured: product.isFeatured,
@@ -73,6 +75,7 @@ export async function createProduct(req: Request, res: Response) {
     discountPercent: payload.discount_percent ?? 0,
     lowStockThreshold: payload.low_stock_threshold ?? 10,
     category: payload.category,
+    target: payload.target,
     images: payload.images ?? null,
     isActive: payload.is_active ?? true,
     isFeatured: payload.is_featured ?? false,
@@ -160,6 +163,9 @@ export async function updateProductById(req: Request, res: Response) {
   }
   if (payload.category !== undefined) {
     product.category = payload.category;
+  }
+  if (payload.target !== undefined) {
+    product.target = payload.target;
   }
   if (payload.images !== undefined) {
     product.images = payload.images;
