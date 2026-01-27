@@ -91,6 +91,11 @@ export async function listUserOrders(req: Request, res: Response) {
     total: order.total,
     currency: order.currency,
     created_at: order.createdAt,
+    shipping: {
+      provider: order.shippingProvider,
+      type: order.shippingType,
+      price: order.shippingPrice ?? order.shippingTotal,
+    },
     payment: order.payment
       ? {
           status: order.payment.status,
@@ -137,6 +142,12 @@ export async function getUserOrderById(req: Request, res: Response) {
     currency: order.currency,
     notes: order.notes,
     created_at: order.createdAt,
+    shipping: {
+      provider: order.shippingProvider,
+      type: order.shippingType,
+      price: order.shippingPrice ?? order.shippingTotal,
+      meta: order.shippingMeta ?? null,
+    },
     payment: order.payment
       ? {
           status: order.payment.status,

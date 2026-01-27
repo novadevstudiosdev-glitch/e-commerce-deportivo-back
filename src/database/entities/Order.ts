@@ -66,6 +66,18 @@ export class Order {
   @Column({ type: 'numeric', precision: 12, scale: 2 })
   total: string;
 
+  @Column({ name: 'shipping_provider', type: 'varchar', length: 40, nullable: true })
+  shippingProvider: string | null;
+
+  @Column({ name: 'shipping_type', type: 'varchar', length: 20, nullable: true })
+  shippingType: string | null;
+
+  @Column({ name: 'shipping_price', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  shippingPrice: string | null;
+
+  @Column({ name: 'shipping_meta', type: 'jsonb', nullable: true })
+  shippingMeta: Record<string, unknown> | null;
+
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 

@@ -464,6 +464,16 @@ const schemas: Record<string, SchemaObject> = {
       currency: { type: 'string' },
       notes: { type: 'string', nullable: true },
       created_at: { type: 'string', format: 'date-time' },
+      shipping: {
+        type: 'object',
+        nullable: true,
+        properties: {
+          provider: { type: 'string', nullable: true },
+          type: { type: 'string', nullable: true },
+          price: { type: 'string', nullable: true },
+          meta: { type: 'object', nullable: true, additionalProperties: true },
+        },
+      },
       payment: {
         type: 'object',
         properties: {
@@ -494,6 +504,15 @@ const schemas: Record<string, SchemaObject> = {
             total: { type: 'string' },
             currency: { type: 'string' },
             created_at: { type: 'string', format: 'date-time' },
+            shipping: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                provider: { type: 'string', nullable: true },
+                type: { type: 'string', nullable: true },
+                price: { type: 'string', nullable: true },
+              },
+            },
             payment: {
               type: 'object',
               properties: {
@@ -668,6 +687,71 @@ const schemas: Record<string, SchemaObject> = {
       sandboxInitPoint: { type: 'string', nullable: true },
     },
     required: ['preferenceId'],
+  },
+  CorreoArgentinoQuoteRequest: {
+    type: 'object',
+    properties: {
+      postalCode: { type: 'string' },
+      province: { type: 'string' },
+      weight: { type: 'number', minimum: 0 },
+      dimensions: {
+        type: 'object',
+        properties: {
+          height: { type: 'number', minimum: 0 },
+          width: { type: 'number', minimum: 0 },
+          length: { type: 'number', minimum: 0 },
+        },
+        required: ['height', 'width', 'length'],
+      },
+    },
+    required: ['postalCode', 'province', 'weight', 'dimensions'],
+  },
+  CorreoArgentinoQuoteResponse: {
+    type: 'object',
+    properties: {
+      provider: { type: 'string', example: 'correo_argentino' },
+      options: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['domicilio', 'sucursal'] },
+            price: { type: 'number' },
+            estimated_days: { type: 'number', nullable: true },
+            meta: { type: 'object', nullable: true, additionalProperties: true },
+          },
+          required: ['type', 'price'],
+        },
+      },
+    },
+    required: ['provider', 'options'],
+  },
+  OrderShippingRequest: {
+    type: 'object',
+    properties: {
+      provider: { type: 'string', example: 'correo_argentino' },
+      type: { type: 'string', enum: ['domicilio', 'sucursal'] },
+      price: { type: 'number', minimum: 0 },
+      meta: { type: 'object', nullable: true, additionalProperties: true },
+    },
+    required: ['type', 'price'],
+  },
+  OrderShippingResponse: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+      total: { type: 'string' },
+      shipping: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string', nullable: true },
+          type: { type: 'string', nullable: true },
+          price: { type: 'string', nullable: true },
+          meta: { type: 'object', nullable: true, additionalProperties: true },
+        },
+      },
+    },
+    required: ['orderId', 'total', 'shipping'],
   },
   MercadoPagoPaymentRequest: {
     type: 'object',
@@ -1532,6 +1616,25 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/api/shipping/cotizar/correo-argentino': {
+    post: {
+      tags: ['shipping'],
+      summary: 'Quote Correo Argentino shipping',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('CorreoArgentinoQuoteRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('CorreoArgentinoQuoteResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '502': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/api/orders/{orderId}/payment': {
     get: {
       tags: ['payments', 'orders'],
@@ -1545,6 +1648,31 @@ const extraPaths: PathsObject = {
         '400': jsonResponse(ref('ErrorResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
         '404': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/orders/{orderId}/shipping': {
+    post: {
+      tags: ['orders', 'shipping'],
+      summary: 'Assign shipping to order',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'orderId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('OrderShippingRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('OrderShippingResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
       },
     },
   },
@@ -1639,7 +1767,7 @@ const extraPaths: PathsObject = {
       },
     },
   },
-  '/orders': {
+  '/api/orders': {
     post: {
       tags: ['orders'],
       summary: 'Create order',
@@ -1738,7 +1866,7 @@ const extraPaths: PathsObject = {
       },
     },
   },
-  '/orders/from-cart': {
+  '/api/orders/from-cart': {
     post: {
       tags: ['orders'],
       summary: 'Create order from cart',
