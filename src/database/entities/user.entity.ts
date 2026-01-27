@@ -25,7 +25,7 @@ export class User {
   @Column({ name: 'google_id', type: 'varchar', nullable: true })
   googleId: string | null;
 
-  @Column({ type: 'varchar', default: 'customer' })
+  @Column({ type: 'varchar', default: 'usuario' })
   role: string;
 
   @Column({ name: 'is_active', type: 'boolean', default: true })

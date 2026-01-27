@@ -6,6 +6,7 @@ import {
   couponQuerySchema,
   couponUpdateSchema,
 } from '../schemas/coupon.schema';
+import { ensureAdmin } from '../../../common/utils/ensure-admin';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -41,6 +42,10 @@ function mapCoupon(coupon: Coupon) {
 }
 
 export async function createCoupon(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const parsed = couponCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -74,6 +79,10 @@ export async function createCoupon(req: Request, res: Response) {
 }
 
 export async function listCoupons(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const parsed = couponQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -96,6 +105,10 @@ export async function listCoupons(req: Request, res: Response) {
 }
 
 export async function updateCoupon(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const { id } = req.params;
   if (!id || Array.isArray(id)) {
     return res.status(400).json({ error: 'Invalid id' });
@@ -150,6 +163,10 @@ export async function updateCoupon(req: Request, res: Response) {
 }
 
 export async function deleteCoupon(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const { id } = req.params;
   if (!id || Array.isArray(id)) {
     return res.status(400).json({ error: 'Invalid id' });

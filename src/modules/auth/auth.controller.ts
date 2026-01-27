@@ -285,7 +285,7 @@ export class AuthController {
           const user = userRepo.create({
             email,
             password: passwordHash,
-            role: 'customer',
+            role: 'usuario',
             isActive: true,
             emailVerified: false,
           });
@@ -349,8 +349,8 @@ export class AuthController {
   @Get('verify-email')
   async verifyEmailLink(@Req() req: Request, @Res() res: Response) {
     const frontendBase = this.getFrontendUrl().replace(/\/$/, '');
-    const successUrl = `${frontendBase}/?verified=1`;
-    const failureUrl = `${frontendBase}/?verified=0`;
+    const successUrl = `${frontendBase}/login?verified=1`;
+    const failureUrl = `${frontendBase}/login?verified=0`;
 
     if (!this.isEmailFlowEnabled()) {
       return res.redirect(`${failureUrl}&error=verification_disabled`);
@@ -757,7 +757,7 @@ export class AuthController {
       email,
       googleId,
       password: null,
-      role: 'customer',
+      role: 'usuario',
       isActive: true,
       emailVerified: !emailFlowEnabled,
     });

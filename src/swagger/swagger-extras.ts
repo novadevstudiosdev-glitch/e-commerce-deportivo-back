@@ -52,7 +52,7 @@ const schemas: Record<string, SchemaObject> = {
     type: 'object',
     properties: {
       id: { type: 'string', format: 'uuid' },
-      role: { type: 'string', enum: ['customer', 'admin'] },
+      role: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] },
     },
     required: ['id', 'role'],
   },
@@ -72,7 +72,7 @@ const schemas: Record<string, SchemaObject> = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       email: { type: 'string', format: 'email' },
-      role: { type: 'string', enum: ['customer', 'admin'] },
+      role: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] },
       profile: {
         type: 'object',
         properties: {
@@ -227,7 +227,7 @@ const schemas: Record<string, SchemaObject> = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       email: { type: 'string', format: 'email' },
-      role: { type: 'string', enum: ['customer', 'admin'] },
+      role: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] },
       email_verified: { type: 'boolean' },
       profile: ref('UserProfile'),
       addresses: {
@@ -1717,6 +1717,8 @@ const httpMethods: HttpMethod[] = [
   'trace',
 ];
 
+const adminRoleNote = 'Requires admin role.';
+
 function mergePaths(base: PathsObject, overrides: PathsObject): PathsObject {
   const merged: PathsObject = { ...base };
 
@@ -1741,13 +1743,61 @@ function mergePaths(base: PathsObject, overrides: PathsObject): PathsObject {
   return merged;
 }
 
+function annotateAdminOperations(paths: PathsObject): PathsObject {
+  const annotated: PathsObject = {};
+
+  for (const [path, rawItem] of Object.entries(paths)) {
+    const item = rawItem as PathItemObject;
+    let updated = false;
+    const nextItem: PathItemObject = { ...item };
+
+    for (const method of httpMethods) {
+      const operation = item?.[method];
+      if (!operation) {
+        continue;
+      }
+
+      const tags = Array.isArray(operation.tags) ? operation.tags : [];
+      const isAdmin =
+        tags.includes('admin') ||
+        path.startsWith('/api/admin') ||
+        path.startsWith('/admin');
+
+      if (!isAdmin) {
+        continue;
+      }
+
+      const nextOperation = { ...operation };
+      const description =
+        typeof nextOperation.description === 'string'
+          ? nextOperation.description
+          : '';
+
+      if (!description.includes(adminRoleNote)) {
+        nextOperation.description = description
+          ? `${description}\n\n${adminRoleNote}`
+          : adminRoleNote;
+      }
+
+      nextOperation['x-roles'] = ['admin'];
+      nextItem[method] = nextOperation;
+      updated = true;
+    }
+
+    annotated[path] = updated ? nextItem : item;
+  }
+
+  return annotated;
+}
+
 export function applySwaggerExtras(document: OpenAPIObject): OpenAPIObject {
   const components = document.components ?? {};
   const existingSchemas = components.schemas ?? {};
+  const mergedPaths = mergePaths(document.paths ?? {}, extraPaths);
 
   return {
     ...document,
-    paths: mergePaths(document.paths ?? {}, extraPaths),
+    paths: annotateAdminOperations(mergedPaths),
     components: {
       ...components,
       schemas: {

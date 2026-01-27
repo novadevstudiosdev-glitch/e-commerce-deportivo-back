@@ -50,6 +50,7 @@ export type MercadoPagoPreferencePayload = {
     unit_price: number;
     currency_id?: string;
   }>;
+  metadata?: Record<string, unknown>;
   payment_methods?: {
     excluded_payment_types?: Array<{ id: string }>;
     excluded_payment_methods?: Array<{ id: string }>;
@@ -80,6 +81,7 @@ export type MercadoPagoPayment = {
   external_reference?: string;
   transaction_amount?: number;
   currency_id?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export function createPreference(payload: MercadoPagoPreferencePayload) {

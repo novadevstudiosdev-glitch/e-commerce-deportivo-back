@@ -1,17 +1,21 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../../auth/middlewares/auth.middleware';
+import { requireRole } from '../../auth/middlewares/auth.middleware';
 import {
   createProduct,
   deleteProductById,
   getProductById,
+  listAdminProducts,
   updateProductById,
 } from '../controllers/admin.product.controller';
 
 const router = Router();
 
-router.post('/', requireAuth, requireRole('admin'), createProduct);
-router.get('/:id', requireAuth, requireRole('admin'), getProductById);
-router.put('/:id', requireAuth, requireRole('admin'), updateProductById);
-router.delete('/:id', requireAuth, requireRole('admin'), deleteProductById);
+router.use(requireRole('admin', 'vendedor'));
+
+router.get('/', listAdminProducts);
+router.post('/', createProduct);
+router.get('/:id', getProductById);
+router.put('/:id', updateProductById);
+router.delete('/:id', deleteProductById);
 
 export default router;

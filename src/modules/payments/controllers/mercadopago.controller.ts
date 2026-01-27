@@ -214,6 +214,10 @@ export async function createMercadoPagoPreference(req: Request, res: Response) {
     back_urls: backUrls,
     payment_methods: paymentMethods,
     external_reference: order.id,
+    metadata: {
+      orderId: order.id,
+      paymentId: order.payment.id,
+    },
     notification_url: buildNotificationUrl(),
     payer: payerEmail ? { email: payerEmail } : undefined,
   };
@@ -287,8 +291,13 @@ export async function createMercadoPagoPreference(req: Request, res: Response) {
 }
 
 export async function mercadoPagoWebhook(req: Request, res: Response) {
-  if (!verifyWebhookSignature(req)) {
+  const hasSecret = Boolean(process.env.MP_WEBHOOK_SECRET);
+  if (hasSecret && !verifyWebhookSignature(req)) {
     return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  if (!hasSecret && process.env.NODE_ENV === 'development') {
+    console.warn('[MercadoPago] Webhook signature validation skipped (missing MP_WEBHOOK_SECRET).');
   }
 
   const type = parseWebhookType(req);
@@ -310,7 +319,11 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
     return res.status(500).json({ error: 'Failed to fetch Mercado Pago payment' });
   }
 
-  const orderId = mpPayment.external_reference;
+  const metadata = mpPayment.metadata ?? {};
+  const orderId =
+    mpPayment.external_reference ??
+    (typeof metadata.orderId === 'string' ? metadata.orderId : undefined) ??
+    (typeof metadata.order_id === 'string' ? metadata.order_id : undefined);
   if (!orderId) {
     return res.json({ ok: true });
   }
@@ -390,7 +403,17 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
         ...(payment.raw ?? {}),
         mercado_pago: mpPayment,
       };
-      await paymentRepo.save(payment);
+      await AppDataSource.manager.transaction(async (manager) => {
+        const paymentRepoTx = manager.getRepository(Payment);
+        const orderRepoTx = manager.getRepository(Order);
+
+        if (order.status !== 'pagado') {
+          order.status = 'pagado';
+          await orderRepoTx.save(order);
+        }
+
+        await paymentRepoTx.save(payment);
+      });
     }
   } else if (mappedStatus === 'reembolsado') {
     if (payment.status !== 'reembolsado') {
@@ -435,7 +458,17 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
       ...(payment.raw ?? {}),
       mercado_pago: mpPayment,
     };
-    await paymentRepo.save(payment);
+    await AppDataSource.manager.transaction(async (manager) => {
+      const paymentRepoTx = manager.getRepository(Payment);
+      const orderRepoTx = manager.getRepository(Order);
+
+      if (order.status !== 'pendiente_pago') {
+        order.status = 'pendiente_pago';
+        await orderRepoTx.save(order);
+      }
+
+      await paymentRepoTx.save(payment);
+    });
   }
 
   return res.json({ ok: true });

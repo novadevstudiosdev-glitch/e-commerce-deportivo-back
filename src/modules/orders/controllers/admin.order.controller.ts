@@ -7,7 +7,9 @@ import { Product } from '../../../database/entities/Product';
 import { ConfigService } from '@nestjs/config';
 import { paymentStatusSchema } from '../schemas/payment.schema';
 import { orderStatusUpdateSchema } from '../schemas/order.status.schema';
+import { orderQuerySchema } from '../schemas/order.query.schema';
 import { EmailService } from '../../../common/services/email.service';
+import { ensureAdmin } from '../../../common/utils/ensure-admin';
 
 let dataSourceInit: Promise<void> | null = null;
 const emailService = new EmailService(new ConfigService());
@@ -24,7 +26,94 @@ async function ensureDataSource() {
   await dataSourceInit;
 }
 
+function getSortDirection(sort: 'newest' | 'oldest') {
+  return sort === 'oldest' ? 'ASC' : 'DESC';
+}
+
+export async function listAdminOrders(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
+  const parsed = orderQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.join('.') || 'query';
+    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  }
+
+  const { page, limit, orderStatus, paymentStatus, from, to, sort } = parsed.data;
+
+  await ensureDataSource();
+
+  const orderRepo = AppDataSource.getRepository(Order);
+  const baseQb = orderRepo
+    .createQueryBuilder('order')
+    .leftJoin('order.payment', 'payment');
+
+  if (orderStatus) {
+    baseQb.andWhere('order.status = :orderStatus', { orderStatus });
+  }
+
+  if (paymentStatus) {
+    baseQb.andWhere('payment.status = :paymentStatus', { paymentStatus });
+  }
+
+  if (from) {
+    baseQb.andWhere('order.createdAt >= :from', { from });
+  }
+
+  if (to) {
+    baseQb.andWhere('order.createdAt <= :to', { to });
+  }
+
+  const total = await baseQb.clone().getCount();
+
+  const orderIdsRaw = await baseQb
+    .clone()
+    .select('order.id', 'id')
+    .orderBy('order.createdAt', getSortDirection(sort))
+    .skip((page - 1) * limit)
+    .take(limit)
+    .getRawMany<{ id: string }>();
+
+  const orderIds = orderIdsRaw.map((row) => row.id).filter(Boolean);
+
+  if (orderIds.length === 0) {
+    return res.json({ page, limit, total, data: [] });
+  }
+
+  const orders = await orderRepo
+    .createQueryBuilder('order')
+    .leftJoinAndSelect('order.payment', 'payment')
+    .where('order.id IN (:...ids)', { ids: orderIds })
+    .orderBy('order.createdAt', getSortDirection(sort))
+    .getMany();
+
+  const data = orders.map((order) => ({
+    id: order.id,
+    status: order.status,
+    subtotal: order.subtotal,
+    total: order.total,
+    currency: order.currency,
+    created_at: order.createdAt,
+    payment: order.payment
+      ? {
+          status: order.payment.status,
+          provider: order.payment.provider,
+          amount: order.payment.amount,
+        }
+      : null,
+  }));
+
+  return res.json({ page, limit, total, data });
+}
+
 export async function updatePaymentStatus(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const { orderId } = req.params;
   if (!orderId || Array.isArray(orderId)) {
     return res.status(400).json({ error: 'Invalid orderId' });
@@ -186,6 +275,10 @@ export async function updatePaymentStatus(req: Request, res: Response) {
 }
 
 export async function updateOrderStatus(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const { orderId } = req.params;
   if (!orderId || Array.isArray(orderId)) {
     return res.status(400).json({ error: 'Invalid orderId' });

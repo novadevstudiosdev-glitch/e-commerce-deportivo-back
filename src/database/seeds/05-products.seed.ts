@@ -4,10 +4,10 @@ import { generate250Products } from './utils/product-generator';
 import type { ProductData } from './utils/product-generator';
 
 const CATEGORY_BY_ID: Record<number, string> = {
-  1: 'calzado',
-  2: 'ropa',
-  3: 'accesorios',
-  4: 'equipamiento',
+  1: 'Calzado',
+  2: 'Ropa',
+  3: 'Accesorios',
+  4: 'Equipamiento',
 };
 
 const TARGETS = ['Hombre', 'Mujer', 'Ni\u00f1o', 'Accesorio'] as const;
@@ -27,8 +27,13 @@ const hasSmallSize = (sizes: string[]) => {
   });
 };
 
+const normalizeCategory = (value: string) =>
+  value.trim().toLowerCase();
+
 const inferTarget = (data: ProductData, category: string): TargetValue => {
-  if (category === 'accesorios') {
+  const normalizedCategory = normalizeCategory(category);
+
+  if (normalizedCategory === 'accesorios') {
     return 'Accesorio';
   }
 
@@ -37,7 +42,7 @@ const inferTarget = (data: ProductData, category: string): TargetValue => {
   );
   const hasXL = sizes.includes('xl') || sizes.includes('xxl');
 
-  if (category === 'ropa' && hasSmallSize(sizes) && !hasXL) {
+  if (normalizedCategory === 'ropa' && hasSmallSize(sizes) && !hasXL) {
     return 'Ni\u00f1o';
   }
 

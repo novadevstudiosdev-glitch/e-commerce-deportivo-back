@@ -23,6 +23,7 @@ export async function runAllSeeds(dataSource: DataSource): Promise<void> {
     console.log('\n\nAll seeds completed successfully!');
     console.log('Database is ready with:');
     console.log('  - Admin user (admin@sportshop.com / Admin123!)');
+    console.log('  - Vendedor user (vendedor@example.com / Vendedor123!)');
     console.log('  - 250 Products');
     console.log('  - 2 Coupons (WELCOME10, SAVE500)');
   } catch (error) {
