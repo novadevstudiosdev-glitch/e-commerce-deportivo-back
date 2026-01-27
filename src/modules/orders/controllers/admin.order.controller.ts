@@ -255,7 +255,7 @@ export async function updatePaymentStatus(req: Request, res: Response) {
         }
 
         payment.status = 'reembolsado';
-        order.status = 'pagado';
+        order.status = 'reembolsado';
 
         await paymentRepo.save(payment);
         await orderRepoTx.save(order);

@@ -163,6 +163,10 @@ export class AuthController {
 
         try {
           const user = await this.findOrCreateGoogleUser(payload);
+          if (!user.isActive) {
+            const redirectUrl = `${frontendUrl}/auth/callback?error=inactive_user`;
+            return res.redirect(redirectUrl);
+          }
           if (this.isEmailFlowEnabled() && !user.emailVerified) {
             const redirectUrl = `${frontendUrl}/auth/callback?error=email_not_verified`;
             return res.redirect(redirectUrl);
@@ -219,6 +223,10 @@ export class AuthController {
 
     if (!user || !user.password) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('User inactive');
     }
 
     const passwordMatches = await bcrypt.compare(password, user.password);

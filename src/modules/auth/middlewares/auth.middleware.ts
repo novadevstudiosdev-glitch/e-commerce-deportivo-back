@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { AppDataSource } from '../../../database/data-source';
+import { User } from '../../../database/entities/user.entity';
 
 export type Role = 'usuario' | 'admin' | 'vendedor';
 
@@ -14,6 +16,33 @@ type JwtPayload = {
 };
 
 const VALID_ROLES: Role[] = ['usuario', 'admin', 'vendedor'];
+
+let dataSourceInit: Promise<void> | null = null;
+
+async function ensureDataSource() {
+  if (AppDataSource.isInitialized) {
+    return;
+  }
+
+  if (!dataSourceInit) {
+    dataSourceInit = AppDataSource.initialize().then(() => undefined);
+  }
+
+  await dataSourceInit;
+}
+
+async function getUserStatus(userId: string) {
+  await ensureDataSource();
+  const user = await AppDataSource.getRepository(User).findOne({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    return { exists: false, isActive: false };
+  }
+
+  return { exists: true, isActive: user.isActive };
+}
 
 function normalizeRole(role: JwtPayload['role']): Role | null {
   if (!role) {
@@ -39,7 +68,11 @@ function extractToken(header: string | undefined) {
   return token;
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   const token = extractToken(req.headers.authorization);
 
   if (!token) {
@@ -63,6 +96,18 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
     if (!VALID_ROLES.includes(normalizedRole)) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const status = await getUserStatus(decoded.sub);
+      if (!status.exists) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!status.isActive) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } catch (dbError) {
+      return res.status(500).json({ error: 'Failed to verify user' });
     }
 
     req.user = {
@@ -76,7 +121,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   const token = extractToken(req.headers.authorization);
 
   if (!token) {
@@ -100,6 +149,18 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 
     if (!VALID_ROLES.includes(normalizedRole)) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const status = await getUserStatus(decoded.sub);
+      if (!status.exists) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!status.isActive) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } catch (dbError) {
+      return res.status(500).json({ error: 'Failed to verify user' });
     }
 
     req.user = {

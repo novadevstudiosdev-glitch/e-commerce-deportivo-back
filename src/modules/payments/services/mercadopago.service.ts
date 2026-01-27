@@ -82,10 +82,34 @@ export type MercadoPagoPayment = {
   transaction_amount?: number;
   currency_id?: string;
   metadata?: Record<string, unknown>;
+  point_of_interaction?: Record<string, unknown>;
+  three_ds_info?: Record<string, unknown>;
 };
 
 export function createPreference(payload: MercadoPagoPreferencePayload) {
   return mpRequest<MercadoPagoPreferenceResponse>('/checkout/preferences', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type MercadoPagoPaymentPayload = {
+  transaction_amount: number;
+  token: string;
+  description?: string;
+  installments: number;
+  payment_method_id: string;
+  issuer_id?: string | number;
+  payer: {
+    email: string;
+  };
+  external_reference?: string;
+  metadata?: Record<string, unknown>;
+  notification_url?: string;
+};
+
+export function createPayment(payload: MercadoPagoPaymentPayload) {
+  return mpRequest<MercadoPagoPayment>('/v1/payments', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
