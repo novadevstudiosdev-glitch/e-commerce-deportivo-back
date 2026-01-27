@@ -55,7 +55,7 @@ async function bootstrap() {
   expressApp.use('/api', cartRoutes);
   expressApp.use('/api', userOrderRoutes);
   expressApp.use('/api', paymentRoutes);
-  expressApp.use(orderRoutes);
+  expressApp.use('/api', orderRoutes);
   expressApp.use('/api/admin/orders', adminOrderRoutes);
 
   // CORS

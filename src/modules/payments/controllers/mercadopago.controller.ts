@@ -443,12 +443,16 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
             mercado_pago: mpPayment,
           };
 
+          order.status = 'reembolsado';
           await paymentRepoTx.save(payment);
           await orderRepoTx.save(order);
         });
       } catch (error) {
         return res.status(500).json({ error: 'Failed to refund payment' });
       }
+    } else if (order.status !== 'reembolsado') {
+      order.status = 'reembolsado';
+      await AppDataSource.getRepository(Order).save(order);
     }
   } else {
     payment.status = mappedStatus;
