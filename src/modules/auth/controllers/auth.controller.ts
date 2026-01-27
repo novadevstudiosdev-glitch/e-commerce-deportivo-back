@@ -50,7 +50,7 @@ export async function register(req: Request, res: Response) {
       const user = userRepo.create({
         email,
         password: passwordHash,
-        role: 'customer',
+        role: 'usuario',
         isActive: true,
         emailVerified: false,
       });

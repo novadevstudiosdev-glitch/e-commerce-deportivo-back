@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
-export type Role = 'customer' | 'admin';
+export type Role = 'usuario' | 'admin' | 'vendedor';
 
 export type AuthUser = {
   id: string;
@@ -10,8 +10,20 @@ export type AuthUser = {
 
 type JwtPayload = {
   sub?: string;
-  role?: Role;
+  role?: Role | 'customer';
 };
+
+const VALID_ROLES: Role[] = ['usuario', 'admin', 'vendedor'];
+
+function normalizeRole(role: JwtPayload['role']): Role | null {
+  if (!role) {
+    return null;
+  }
+  if (role === 'customer') {
+    return 'usuario';
+  }
+  return role;
+}
 
 function extractToken(header: string | undefined) {
   if (!header) {
@@ -43,17 +55,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
 
-    if (!decoded?.sub || !decoded.role) {
+    const normalizedRole = normalizeRole(decoded?.role);
+
+    if (!decoded?.sub || !normalizedRole) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (decoded.role !== 'customer' && decoded.role !== 'admin') {
+    if (!VALID_ROLES.includes(normalizedRole)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     req.user = {
       id: decoded.sub,
-      role: decoded.role,
+      role: normalizedRole,
     };
 
     return next();
@@ -78,17 +92,19 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
 
-    if (!decoded?.sub || !decoded.role) {
+    const normalizedRole = normalizeRole(decoded?.role);
+
+    if (!decoded?.sub || !normalizedRole) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (decoded.role !== 'customer' && decoded.role !== 'admin') {
+    if (!VALID_ROLES.includes(normalizedRole)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     req.user = {
       id: decoded.sub,
-      role: decoded.role,
+      role: normalizedRole,
     };
 
     return next();
@@ -118,3 +134,5 @@ export function requireRole(...roles: Role[]) {
     return requireAuth(req, res, continueWithRoleCheck);
   };
 }
+
+export const requireAdmin = requireRole('admin');

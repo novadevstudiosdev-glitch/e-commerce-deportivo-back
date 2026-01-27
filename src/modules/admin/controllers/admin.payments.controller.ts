@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { AppDataSource } from '../../../database/data-source';
 import { Payment } from '../../../database/entities/Payment';
 import { paymentsQuerySchema } from '../schemas/payments.schema';
+import { ensureAdmin } from '../../../common/utils/ensure-admin';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -18,6 +19,10 @@ async function ensureDataSource() {
 }
 
 export async function listPayments(req: Request, res: Response) {
+  if (!ensureAdmin(req, res)) {
+    return;
+  }
+
   const parsed = paymentsQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

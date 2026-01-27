@@ -5,6 +5,8 @@ import {
   productCreateSchema,
   productUpdateSchema,
 } from '../schemas/product.schema';
+import { ensureStaff } from '../../../common/utils/ensure-staff';
+import { adminProductQuerySchema } from '../schemas/admin.product.query.schema';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -52,6 +54,10 @@ function mapProduct(product: Product) {
 }
 
 export async function createProduct(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const parsed = productCreateSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -86,6 +92,10 @@ export async function createProduct(req: Request, res: Response) {
 }
 
 export async function getProductById(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const { id } = req.params;
 
   if (!id || Array.isArray(id)) {
@@ -105,6 +115,10 @@ export async function getProductById(req: Request, res: Response) {
 }
 
 export async function updateProductById(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const { id } = req.params;
 
   if (!id || Array.isArray(id)) {
@@ -182,6 +196,10 @@ export async function updateProductById(req: Request, res: Response) {
 }
 
 export async function deleteProductById(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const { id } = req.params;
 
   if (!id || Array.isArray(id)) {
@@ -200,4 +218,48 @@ export async function deleteProductById(req: Request, res: Response) {
   product.isActive = false;
   const saved = await repo.save(product);
   return res.json(mapProduct(saved));
+}
+
+export async function listAdminProducts(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
+  const parsed = adminProductQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.join('.') || 'query';
+    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  }
+
+  await ensureDataSource();
+
+  const { page, limit, q, is_active } = parsed.data;
+
+  const qb = AppDataSource.getRepository(Product).createQueryBuilder('product');
+  qb.where('1=1');
+
+  if (q) {
+    qb.andWhere(
+      '(product.name ILIKE :q OR product.description ILIKE :q OR product.category ILIKE :q)',
+      { q: `%${q}%` },
+    );
+  }
+
+  if (is_active !== undefined) {
+    qb.andWhere('product.is_active = :isActive', { isActive: is_active });
+  }
+
+  const [items, total] = await qb
+    .orderBy('product.updated_at', 'DESC')
+    .skip((page - 1) * limit)
+    .take(limit)
+    .getManyAndCount();
+
+  return res.json({
+    page,
+    limit,
+    total,
+    data: items.map(mapProduct),
+  });
 }

@@ -4,6 +4,7 @@ import { Order } from '../../../database/entities/Order';
 import { OrderItem } from '../../../database/entities/OrderItem';
 import type { SelectQueryBuilder } from 'typeorm';
 import { statsQuerySchema } from '../schemas/stats.schema';
+import { ensureStaff } from '../../../common/utils/ensure-staff';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -29,6 +30,10 @@ function applyDateFilters(qb: SelectQueryBuilder<Order>, from?: Date, to?: Date)
 }
 
 export async function getSalesSummary(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const parsed = statsQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -75,6 +80,10 @@ export async function getSalesSummary(req: Request, res: Response) {
 }
 
 export async function getTopProducts(req: Request, res: Response) {
+  if (!ensureStaff(req, res)) {
+    return;
+  }
+
   const parsed = statsQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

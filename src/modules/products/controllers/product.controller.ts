@@ -17,6 +17,23 @@ async function ensureDataSource() {
   await dataSourceInit;
 }
 
+function serializeProduct(product: Product) {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    currency: product.currency,
+    stock: product.stock,
+    discount_percent: product.discountPercent,
+    category: product.category,
+    target: product.target,
+    images: product.images,
+    is_featured: product.isFeatured,
+    created_at: product.createdAt,
+  };
+}
+
 export async function listProducts(req: Request, res: Response) {
   const parsed = productQuerySchema.safeParse(req.query);
 
@@ -84,20 +101,7 @@ export async function listProducts(req: Request, res: Response) {
     .take(limit)
     .getManyAndCount();
 
-  const data = items.map((product) => ({
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    price: product.price,
-    currency: product.currency,
-    stock: product.stock,
-    discount_percent: product.discountPercent,
-    category: product.category,
-    target: product.target,
-    images: product.images,
-    is_featured: product.isFeatured,
-    created_at: product.createdAt,
-  }));
+  const data = items.map((product) => serializeProduct(product));
 
   return res.json({
     page,
@@ -105,4 +109,39 @@ export async function listProducts(req: Request, res: Response) {
     total,
     data,
   });
+}
+
+export async function getProductById(req: Request, res: Response) {
+  const { id } = req.params;
+
+  if (!id || Array.isArray(id)) {
+    return res.status(400).json({ error: 'Invalid product id' });
+  }
+
+  await ensureDataSource();
+
+  const product = await AppDataSource.getRepository(Product).findOne({
+    where: { id, isActive: true },
+  });
+
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  return res.json(serializeProduct(product));
+}
+
+export async function listProductCategories(_req: Request, res: Response) {
+  await ensureDataSource();
+
+  const rows = await AppDataSource.getRepository(Product)
+    .createQueryBuilder('product')
+    .select('DISTINCT product.category', 'category')
+    .where('product.is_active = true')
+    .orderBy('product.category', 'ASC')
+    .getRawMany<{ category: string }>();
+
+  const data = rows.map((row) => row.category).filter(Boolean);
+
+  return res.json({ data });
 }

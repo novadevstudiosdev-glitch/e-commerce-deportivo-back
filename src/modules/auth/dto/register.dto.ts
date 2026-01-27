@@ -35,7 +35,7 @@ export class RegisterResponseDto {
   @ApiProperty({ example: 'user@example.com' })
   email: string;
 
-  @ApiProperty({ example: 'customer' })
+  @ApiProperty({ example: 'usuario' })
   role: string;
 
   @ApiProperty({ type: RegisterProfileResponseDto })

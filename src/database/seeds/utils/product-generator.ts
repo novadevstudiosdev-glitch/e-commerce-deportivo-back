@@ -64,27 +64,340 @@ const COLORS = [
 ];
 
 const SHOE_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
-const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const CLOTHING_SIZES = ['S', 'M', 'L', 'XL'];
+const CLOTHING_SIZES_KIDS = ['XS', 'S', 'M'];
 const UNIQUE_SIZE = ['Única'];
 
+const SPORT_LABELS: Record<number, string> = {
+  [SPORTS.RUNNING]: 'running',
+  [SPORTS.FUTBOL]: 'futbol',
+  [SPORTS.NATACION]: 'natacion',
+  [SPORTS.RUGBY]: 'rugby',
+  [SPORTS.HOCKEY]: 'hockey',
+  [SPORTS.FITNESS]: 'fitness',
+  [SPORTS.CICLISMO]: 'ciclismo',
+  [SPORTS.TENIS]: 'tenis',
+  [SPORTS.BALONCESTO]: 'baloncesto',
+};
+
+const SPORT_IMAGE_KEYWORDS: Record<number, string> = {
+  [SPORTS.RUNNING]: 'running',
+  [SPORTS.FUTBOL]: 'soccer',
+  [SPORTS.NATACION]: 'swimming',
+  [SPORTS.RUGBY]: 'rugby',
+  [SPORTS.HOCKEY]: 'field hockey',
+  [SPORTS.FITNESS]: 'fitness',
+  [SPORTS.CICLISMO]: 'cycling',
+  [SPORTS.TENIS]: 'tennis',
+  [SPORTS.BALONCESTO]: 'basketball',
+};
+
+const formatList = (items: string[]) => items.filter(Boolean).join(', ');
+const formatSpecs = (items: string[]) => items.filter(Boolean).join(' | ');
+
+const getSportLabel = (sportId: number | null) =>
+  (sportId ? SPORT_LABELS[sportId] : null) ?? 'deportivo';
+
+const pickColors = (seed: number, count: number) => {
+  const safeCount = Math.max(1, Math.min(count, COLORS.length));
+  const start = seed % COLORS.length;
+  return Array.from({ length: safeCount }, (_item, idx) => COLORS[(start + idx) % COLORS.length]);
+};
+
+const getColorCount = (name: string, categoryId: number) => {
+  const normalized = normalizeQuery(name).toLowerCase();
+  if (normalized.includes('balon') || normalized.includes('gafas') || normalized.includes('gorro')) {
+    return 2;
+  }
+  if (normalized.includes('botella') || normalized.includes('mochila')) {
+    return 3;
+  }
+  if (categoryId === CATEGORIES.CALZADO) return 3;
+  if (categoryId === CATEGORIES.ROPA) return 4;
+  if (categoryId === CATEGORIES.ACCESORIOS) return 2;
+  return normalized.includes('mat') ? 3 : 1;
+};
+
+const getSizesForProduct = (categoryId: number, seed: number) => {
+  if (categoryId === CATEGORIES.CALZADO) return SHOE_SIZES;
+  if (categoryId === CATEGORIES.ROPA) {
+    return seed % 12 === 0 ? CLOTHING_SIZES_KIDS : CLOTHING_SIZES;
+  }
+  return UNIQUE_SIZE;
+};
+
+const buildVariants = (
+  sizes: string[],
+  colors: Array<{ name: string; hex: string }>,
+  seed: number,
+  baseStock: number,
+) =>
+  sizes.map((size, idx) => {
+    const color = colors[idx % colors.length];
+    return {
+      color: color.name,
+      color_hex: color.hex,
+      size,
+      stock: baseStock + ((seed + idx) % 8),
+    };
+  });
+
+const buildSpecs = (
+  name: string,
+  categoryId: number,
+  sportId: number | null,
+  seed: number,
+) => {
+  const normalized = normalizeQuery(name).toLowerCase();
+  const specs: string[] = [];
+
+  if (categoryId === CATEGORIES.CALZADO) {
+    const weight = 240 + (seed % 70);
+    if (sportId === SPORTS.FUTBOL) {
+      specs.push('Empeine: sintetico texturado');
+      specs.push('Suela: tacos FG/AG');
+      specs.push('Placa: rigida con estabilidad');
+      specs.push(`Peso: ${weight} g (talle 41)`);
+      specs.push('Uso: pasto natural y sintetico');
+      return specs;
+    }
+
+    const drop = 6 + (seed % 6);
+    const foam = ['EVA', 'React', 'Boost', 'FreshFoam'][seed % 4];
+    specs.push('Capellada: mesh tecnico');
+    specs.push(`Mediasuela: espuma ${foam}`);
+    specs.push('Suela: goma con traccion multidireccional');
+    specs.push(`Drop: ${drop} mm`);
+    specs.push(`Peso: ${weight} g (talle 41)`);
+    return specs;
+  }
+
+  if (categoryId === CATEGORIES.ROPA) {
+    const fit = ['regular', 'entallado', 'relajado'][seed % 3];
+    const fabric = ['poliester elastico', 'poliester reciclado', 'poliester con elastano'][seed % 3];
+    specs.push(`Tejido: ${fabric}`);
+    specs.push(`Ajuste: ${fit}`);
+    specs.push('Tecnologia: secado rapido');
+    specs.push('Costuras: planas antirozaduras');
+    return specs;
+  }
+
+  if (categoryId === CATEGORIES.ACCESORIOS) {
+    const weight = 80 + (seed % 140);
+    if (normalized.includes('gafas')) {
+      specs.push('Lente: antiempañante');
+      specs.push('Ajuste: doble correa');
+      specs.push(`Peso: ${weight} g`);
+      specs.push('Uso: entrenamiento y competencia');
+      return specs;
+    }
+    if (normalized.includes('gorro')) {
+      specs.push('Material: silicona elastica');
+      specs.push('Ajuste: compresivo');
+      specs.push(`Peso: ${weight} g`);
+      specs.push('Uso: piscina y aguas abiertas');
+      return specs;
+    }
+    if (normalized.includes('balon')) {
+      specs.push('Superficie: PU texturado');
+      specs.push('Costuras: termoselladas');
+      specs.push('Talla: 5');
+      specs.push(`Peso: ${weight} g`);
+      return specs;
+    }
+    if (normalized.includes('guantes')) {
+      specs.push('Palma: latex de alto agarre');
+      specs.push('Cierre: velcro ajustable');
+      specs.push(`Peso: ${weight} g`);
+      specs.push('Uso: entrenamiento y partido');
+      return specs;
+    }
+    if (normalized.includes('botella')) {
+      specs.push('Capacidad: 750 ml');
+      specs.push('Material: libre de BPA');
+      specs.push(`Peso: ${weight} g`);
+      specs.push('Tapa: antigoteo');
+      return specs;
+    }
+    specs.push('Material: poliester/nylon');
+    specs.push('Ajuste: regulable');
+    specs.push(`Peso: ${weight} g`);
+    specs.push('Uso: entrenamiento y competencia');
+    return specs;
+  }
+
+  const baseWeight = 4 + (seed % 12);
+  if (normalized.includes('mat')) {
+    specs.push('Material: TPE antideslizante');
+    specs.push(`Espesor: ${6 + (seed % 5)} mm`);
+    specs.push('Medidas: 180 x 60 cm');
+    specs.push('Uso: yoga y entrenamiento funcional');
+    return specs;
+  }
+  if (normalized.includes('bandas')) {
+    specs.push('Material: latex resistente');
+    specs.push('Resistencia: media');
+    specs.push('Largo: 1.2 m');
+    specs.push('Uso: fuerza y movilidad');
+    return specs;
+  }
+  if (normalized.includes('cuerda')) {
+    specs.push('Largo: 3 m');
+    specs.push('Rodamientos: suaves y silenciosos');
+    specs.push('Ajuste: rapido');
+    specs.push('Uso: cardio y coordinacion');
+    return specs;
+  }
+  if (normalized.includes('rodillo')) {
+    specs.push('Material: espuma alta densidad');
+    specs.push('Largo: 33 cm');
+    specs.push('Densidad: media');
+    specs.push('Uso: liberacion miofascial');
+    return specs;
+  }
+  specs.push(`Peso: ${baseWeight} kg`);
+  specs.push('Material: goma y acero recubierto');
+  specs.push('Agarre: antideslizante');
+  specs.push('Uso: entrenamiento funcional');
+  return specs;
+};
+
+const buildDescription = (
+  name: string,
+  categoryId: number,
+  sportId: number | null,
+  sizes: string[],
+  colors: Array<{ name: string; hex: string }>,
+  seed: number,
+) => {
+  const sportLabel = getSportLabel(sportId);
+  const colorNames = colors.map((color) => color.name);
+  const sizeLine = sizes.length ? `Talles disponibles: ${formatList(sizes)}.` : '';
+  const colorLine = colorNames.length ? `Colores: ${formatList(colorNames)}.` : '';
+  const specs = buildSpecs(name, categoryId, sportId, seed);
+
+  if (categoryId === CATEGORIES.CALZADO) {
+    return `${name} pensado para ${sportLabel} y entrenamientos exigentes, con amortiguacion reactiva y soporte estable para sesiones largas. La capellada liviana mejora la ventilacion y el ajuste seguro en cada paso. ${sizeLine} ${colorLine} Especificaciones: ${formatSpecs(specs)}.`;
+  }
+  if (categoryId === CATEGORIES.ROPA) {
+    return `${name} tecnico para ${sportLabel}, confeccionado en tejido elastico y de secado rapido para mantener la piel fresca. El corte favorece la movilidad y las costuras planas reducen roces en entrenamientos intensos. ${sizeLine} ${colorLine} Especificaciones: ${formatSpecs(specs)}.`;
+  }
+  if (categoryId === CATEGORIES.ACCESORIOS) {
+    return `${name} funcional para ${sportLabel}, pensado para comodidad y practicidad en el dia a dia. Materiales resistentes y detalles de ajuste aseguran un uso confiable en cada sesion. ${sizeLine} ${colorLine} Especificaciones: ${formatSpecs(specs)}.`;
+  }
+  return `${name} diseñado para ${sportLabel} y rutinas de fuerza, con estructura robusta y agarre seguro. Ideal para entrenar en casa o gimnasio sin perder rendimiento. ${sizeLine} ${colorLine} Especificaciones: ${formatSpecs(specs)}.`;
+};
+
 // Imágenes de Unsplash por categoría
-const IMAGES = {
-  ZAPATILLAS: [
-    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800',
-    'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800',
-    'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=800',
-  ],
-  CAMISETA: [
-    'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800',
-    'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800',
-  ],
-  PANTALON: [
-    'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=800',
-    'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800',
-  ],
-  ACCESORIOS: [
-    'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800',
-  ],
+const normalizeQuery = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+const pickImageQuery = (
+  name: string,
+  categoryId: number,
+  sportId?: number | null,
+) => {
+  const normalized = normalizeQuery(name).toLowerCase();
+  const sportKeyword = sportId ? SPORT_IMAGE_KEYWORDS[sportId] ?? 'sports' : 'sports';
+
+  if (normalized.includes('zapatillas') || normalized.includes('botas')) {
+    if (sportId === SPORTS.FUTBOL) return 'soccer cleats product';
+    if (sportId === SPORTS.RUGBY) return 'rugby boots product';
+    if (sportId === SPORTS.HOCKEY) return 'field hockey shoes product';
+    return `${sportKeyword} running shoes product`;
+  }
+  if (normalized.includes('camiseta') || normalized.includes('jersey')) {
+    return `${sportKeyword} jersey product`;
+  }
+  if (normalized.includes('tank top')) {
+    return `${sportKeyword} tank top product`;
+  }
+  if (normalized.includes('pantalon') || normalized.includes('short')) {
+    return `${sportKeyword} sports shorts product`;
+  }
+  if (normalized.includes('mallas')) {
+    return `${sportKeyword} compression tights product`;
+  }
+  if (
+    normalized.includes('sudadera') ||
+    normalized.includes('chaleco') ||
+    normalized.includes('cortavientos')
+  ) {
+    return `${sportKeyword} sports jacket product`;
+  }
+  if (normalized.includes('balon')) {
+    if (sportId === SPORTS.BALONCESTO) return 'basketball ball product';
+    if (sportId === SPORTS.RUGBY) return 'rugby ball product';
+    return 'soccer ball product';
+  }
+  if (normalized.includes('guantes')) {
+    return 'sports gloves product';
+  }
+  if (normalized.includes('gorro')) {
+    return 'swim cap product';
+  }
+  if (normalized.includes('gafas')) {
+    return 'swim goggles product';
+  }
+  if (normalized.includes('banador')) {
+    return 'swimsuit product';
+  }
+  if (normalized.includes('toalla')) {
+    return 'sports towel product';
+  }
+  if (normalized.includes('mochila')) {
+    return 'sports backpack product';
+  }
+  if (normalized.includes('botella')) {
+    return 'sports water bottle product';
+  }
+  if (normalized.includes('mancuernas')) {
+    return 'dumbbells product';
+  }
+  if (normalized.includes('kettlebell')) {
+    return 'kettlebell product';
+  }
+  if (normalized.includes('rodillo')) {
+    return 'foam roller product';
+  }
+  if (normalized.includes('bandas')) {
+    return 'resistance bands product';
+  }
+  if (normalized.includes('cuerda')) {
+    return 'jump rope product';
+  }
+  if (normalized.includes('calcetines') || normalized.includes('medias')) {
+    return 'sports socks product';
+  }
+  if (normalized.includes('espinilleras')) {
+    return 'shin guards product';
+  }
+
+  if (categoryId == CATEGORIES.CALZADO) return `${sportKeyword} running shoes product`;
+  if (categoryId == CATEGORIES.ROPA) return `${sportKeyword} sportswear product`;
+  if (categoryId == CATEGORIES.ACCESORIOS) return 'sports accessories product';
+  return 'fitness equipment product';
+};
+
+const buildImageUrl = (query: string, seed: number) =>
+  `https://source.unsplash.com/featured/800x800?${encodeURIComponent(query)}&sig=${seed}`;
+
+const buildImages = (
+  name: string,
+  categoryId: number,
+  sportId: number | null,
+  seed: number,
+  count = 2,
+) => {
+  const query = pickImageQuery(name, categoryId, sportId);
+  return Array.from({ length: count }, (_item, idx) =>
+    buildImageUrl(query, seed * 10 + idx),
+  );
 };
 
 // Generador de productos
@@ -126,12 +439,22 @@ export const generate250Products = (): ProductData[] => {
     ][index % 5];
     const basePrice = 119.99 + index * 5;
     const discount = index % 3 === 0 ? Math.floor(Math.random() * 30) : 0;
+    const name = `Zapatillas Running ${model}`;
+    const sizes = getSizesForProduct(CATEGORIES.CALZADO, id);
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.CALZADO));
 
     products.push({
       sku: `ZRP-2024-${String(id).padStart(3, '0')}`,
-      name: `Zapatillas Running ${model}`,
+      name,
       slug: `zapatillas-running-${model.toLowerCase().replace(/\s/g, '-')}`,
-      description: `Zapatillas profesionales ${model} con tecnología de última generación para runners exigentes.`,
+      description: buildDescription(
+        name,
+        CATEGORIES.CALZADO,
+        SPORTS.RUNNING,
+        sizes,
+        colors,
+        id,
+      ),
       category_id: CATEGORIES.CALZADO,
       sport_id: SPORTS.RUNNING,
       brand_id: brandId,
@@ -139,13 +462,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: discount,
       stock: 30 + Math.floor(Math.random() * 40),
       is_featured: index % 5 === 0,
-      images: IMAGES.ZAPATILLAS.slice(0, (index % 2) + 1),
-      variants: SHOE_SIZES.slice(0, 4 + (index % 3)).map((size, i) => ({
-        color: COLORS[i % 2].name,
-        color_hex: COLORS[i % 2].hex,
-        size,
-        stock: 5 + Math.floor(Math.random() * 10),
-      })),
+      images: buildImages(
+        name,
+        CATEGORIES.CALZADO,
+        SPORTS.RUNNING,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 6),
     });
     id++;
   });
@@ -165,12 +489,15 @@ export const generate250Products = (): ProductData[] => {
   for (let i = 0; i < 30; i++) {
     const item = runningClothingTypes[i % runningClothingTypes.length];
     const brandId = [BRANDS.NIKE, BRANDS.ADIDAS, BRANDS.PUMA][i % 3];
+    const name = `${item.type} Running Pro ${i + 1}`;
+    const sizes = getSizesForProduct(CATEGORIES.ROPA, id);
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.ROPA));
 
     products.push({
       sku: `RRP-2024-${String(id).padStart(3, '0')}`,
-      name: `${item.type} Running Pro ${i + 1}`,
+      name,
       slug: `${item.type.toLowerCase().replace(/\s/g, '-')}-running-${i + 1}`,
-      description: `${item.type} de alto rendimiento con tecnología Dry-Fit.`,
+      description: buildDescription(name, CATEGORIES.ROPA, SPORTS.RUNNING, sizes, colors, id),
       category_id: CATEGORIES.ROPA,
       sport_id: SPORTS.RUNNING,
       brand_id: brandId,
@@ -178,13 +505,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: i % 4 === 0 ? 20 : 0,
       stock: 80 + Math.floor(Math.random() * 50),
       is_featured: i % 8 === 0,
-      images: IMAGES.CAMISETA,
-      variants: item.sizes.slice(0, 4).map((size, idx) => ({
-        color: COLORS[idx % 3].name,
-        color_hex: COLORS[idx % 3].hex,
-        size,
-        stock: 15 + Math.floor(Math.random() * 15),
-      })),
+      images: buildImages(
+        name,
+        CATEGORIES.ROPA,
+        SPORTS.RUNNING,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 12),
     });
     id++;
   }
@@ -204,11 +532,22 @@ export const generate250Products = (): ProductData[] => {
   ];
 
   runningAccessories.forEach((acc, index) => {
+    const name = `${acc.name} Running`;
+    const sizes = UNIQUE_SIZE;
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.ACCESORIOS));
+
     products.push({
       sku: `RAC-2024-${String(id).padStart(3, '0')}`,
-      name: `${acc.name} Running`,
+      name,
       slug: `${acc.name.toLowerCase().replace(/\s/g, '-')}-running`,
-      description: `${acc.name} diseñado específicamente para runners.`,
+      description: buildDescription(
+        name,
+        CATEGORIES.ACCESORIOS,
+        SPORTS.RUNNING,
+        sizes,
+        colors,
+        id,
+      ),
       category_id: CATEGORIES.ACCESORIOS,
       sport_id: SPORTS.RUNNING,
       brand_id: index % 2 === 0 ? BRANDS.NIKE : null,
@@ -216,11 +555,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: 0,
       stock: 100 + Math.floor(Math.random() * 80),
       is_featured: false,
-      images: IMAGES.ACCESORIOS,
-      variants: [
-        { color: 'Negro', color_hex: '#000000', size: 'Única', stock: 50 },
-        { color: 'Azul', color_hex: '#4169E1', size: 'Única', stock: 50 },
-      ],
+      images: buildImages(
+        name,
+        CATEGORIES.ACCESORIOS,
+        SPORTS.RUNNING,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 25),
     });
     id++;
   });
@@ -240,11 +582,22 @@ export const generate250Products = (): ProductData[] => {
   ];
 
   footballBoots.forEach((model, index) => {
+    const name = `Zapatillas Fútbol ${model}`;
+    const sizes = getSizesForProduct(CATEGORIES.CALZADO, id);
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.CALZADO));
+
     products.push({
       sku: `ZFT-2024-${String(id).padStart(3, '0')}`,
-      name: `Zapatillas Fútbol ${model}`,
+      name,
       slug: `zapatillas-futbol-${model.toLowerCase().replace(/\s/g, '-')}`,
-      description: `Botas de fútbol ${model} profesionales con tacos optimizados.`,
+      description: buildDescription(
+        name,
+        CATEGORIES.CALZADO,
+        SPORTS.FUTBOL,
+        sizes,
+        colors,
+        id,
+      ),
       category_id: CATEGORIES.CALZADO,
       sport_id: SPORTS.FUTBOL,
       brand_id: [BRANDS.ADIDAS, BRANDS.NIKE, BRANDS.PUMA][index % 3],
@@ -252,13 +605,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: index % 4 === 0 ? 15 : 0,
       stock: 35 + Math.floor(Math.random() * 30),
       is_featured: index % 3 === 0,
-      images: IMAGES.ZAPATILLAS,
-      variants: SHOE_SIZES.slice(2, 7).map((size, i) => ({
-        color: COLORS[i % 2].name,
-        color_hex: COLORS[i % 2].hex,
-        size,
-        stock: 6 + Math.floor(Math.random() * 8),
-      })),
+      images: buildImages(
+        name,
+        CATEGORIES.CALZADO,
+        SPORTS.FUTBOL,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 6),
     });
     id++;
   });
@@ -267,12 +621,15 @@ export const generate250Products = (): ProductData[] => {
   for (let i = 0; i < 25; i++) {
     const types = ['Camiseta', 'Short', 'Medias', 'Chándal', 'Sudadera'];
     const type = types[i % types.length];
+    const name = `${type} Fútbol Pro ${i + 1}`;
+    const sizes = getSizesForProduct(CATEGORIES.ROPA, id);
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.ROPA));
 
     products.push({
       sku: `RFT-2024-${String(id).padStart(3, '0')}`,
-      name: `${type} Fútbol Pro ${i + 1}`,
+      name,
       slug: `${type.toLowerCase()}-futbol-${i + 1}`,
-      description: `${type} profesional de fútbol con tecnología Climalite.`,
+      description: buildDescription(name, CATEGORIES.ROPA, SPORTS.FUTBOL, sizes, colors, id),
       category_id: CATEGORIES.ROPA,
       sport_id: SPORTS.FUTBOL,
       brand_id: [BRANDS.NIKE, BRANDS.ADIDAS][i % 2],
@@ -281,13 +638,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: i % 5 === 0 ? 20 : 0,
       stock: 90 + Math.floor(Math.random() * 60),
       is_featured: false,
-      images: IMAGES.CAMISETA,
-      variants: CLOTHING_SIZES.slice(0, 4).map((size, idx) => ({
-        color: COLORS[idx % 4].name,
-        color_hex: COLORS[idx % 4].hex,
-        size,
-        stock: 18 + Math.floor(Math.random() * 12),
-      })),
+      images: buildImages(
+        name,
+        CATEGORIES.ROPA,
+        SPORTS.FUTBOL,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 12),
     });
     id++;
   }
@@ -302,11 +660,22 @@ export const generate250Products = (): ProductData[] => {
   ];
 
   footballAccessories.forEach((acc, index) => {
+    const name = `${acc.name} Fútbol`;
+    const sizes = UNIQUE_SIZE;
+    const colors = pickColors(id, getColorCount(name, CATEGORIES.ACCESORIOS));
+
     products.push({
       sku: `FAC-2024-${String(id).padStart(3, '0')}`,
-      name: `${acc.name} Fútbol`,
+      name,
       slug: `${acc.name.toLowerCase().replace(/\s/g, '-')}-futbol`,
-      description: `${acc.name} profesional para fútbol.`,
+      description: buildDescription(
+        name,
+        CATEGORIES.ACCESORIOS,
+        SPORTS.FUTBOL,
+        sizes,
+        colors,
+        id,
+      ),
       category_id: CATEGORIES.ACCESORIOS,
       sport_id: SPORTS.FUTBOL,
       brand_id: [BRANDS.NIKE, BRANDS.ADIDAS][index % 2],
@@ -314,11 +683,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: 0,
       stock: 70 + Math.floor(Math.random() * 50),
       is_featured: index === 1,
-      images: IMAGES.ACCESORIOS,
-      variants: [
-        { color: 'Negro', color_hex: '#000000', size: 'Única', stock: 35 },
-        { color: 'Blanco', color_hex: '#FFFFFF', size: 'Única', stock: 35 },
-      ],
+      images: buildImages(
+        name,
+        CATEGORIES.ACCESORIOS,
+        SPORTS.FUTBOL,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 20),
     });
     id++;
   });
@@ -359,12 +731,15 @@ export const generate250Products = (): ProductData[] => {
 
   for (let i = 0; i < 25; i++) {
     const prod = swimmingProducts[i % swimmingProducts.length];
+    const name = `${prod.type} Natación ${i + 1}`;
+    const sizes = getSizesForProduct(prod.cat, id);
+    const colors = pickColors(id, getColorCount(name, prod.cat));
 
     products.push({
       sku: `NAT-2024-${String(id).padStart(3, '0')}`,
-      name: `${prod.type} Natación ${i + 1}`,
+      name,
       slug: `${prod.type.toLowerCase()}-natacion-${i + 1}`,
-      description: `${prod.type} profesional para natación de competición.`,
+      description: buildDescription(name, prod.cat, SPORTS.NATACION, sizes, colors, id),
       category_id: prod.cat,
       sport_id: SPORTS.NATACION,
       brand_id: BRANDS.ASICS,
@@ -372,13 +747,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: i % 6 === 0 ? 18 : 0,
       stock: 70 + Math.floor(Math.random() * 60),
       is_featured: i % 8 === 0,
-      images: IMAGES.ACCESORIOS,
-      variants: prod.sizes.slice(0, 3).map((size, idx) => ({
-        color: COLORS[idx % 4].name,
-        color_hex: COLORS[idx % 4].hex,
-        size,
-        stock: 20 + Math.floor(Math.random() * 20),
-      })),
+      images: buildImages(
+        name,
+        prod.cat,
+        SPORTS.NATACION,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 18),
     });
     id++;
   }
@@ -399,12 +775,15 @@ export const generate250Products = (): ProductData[] => {
 
   for (let i = 0; i < 30; i++) {
     const equip = fitnessEquipment[i % fitnessEquipment.length];
+    const name = `${equip.name} Fitness ${i + 1}`;
+    const sizes = getSizesForProduct(equip.cat, id);
+    const colors = pickColors(id, getColorCount(name, equip.cat));
 
     products.push({
       sku: `FIT-2024-${String(id).padStart(3, '0')}`,
-      name: `${equip.name} Fitness ${i + 1}`,
+      name,
       slug: `${equip.name.toLowerCase().replace(/\s/g, '-')}-fitness-${i + 1}`,
-      description: `${equip.name} de alta calidad para entrenamientos exigentes.`,
+      description: buildDescription(name, equip.cat, SPORTS.FITNESS, sizes, colors, id),
       category_id: equip.cat,
       sport_id: SPORTS.FITNESS,
       brand_id: i % 3 === 0 ? BRANDS.REEBOK : null,
@@ -412,10 +791,14 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: i % 5 === 0 ? 15 : 0,
       stock: 50 + Math.floor(Math.random() * 100),
       is_featured: i % 10 === 0,
-      images: IMAGES.ACCESORIOS,
-      variants: [
-        { color: 'Negro', color_hex: '#000000', size: 'Única', stock: 50 },
-      ],
+      images: buildImages(
+        name,
+        equip.cat,
+        SPORTS.FITNESS,
+        id,
+        2,
+      ),
+      variants: buildVariants(sizes, colors, id, 20),
     });
     id++;
   }
@@ -446,21 +829,23 @@ export const generate250Products = (): ProductData[] => {
     if (cat === CATEGORIES.CALZADO) {
       name = `Zapatillas ${sport.name}`;
       price = 99.99;
-      sizes = SHOE_SIZES.slice(0, 5);
+      sizes = getSizesForProduct(CATEGORIES.CALZADO, id);
     } else if (cat === CATEGORIES.ROPA) {
       name = `Camiseta ${sport.name}`;
       price = 44.99;
-      sizes = CLOTHING_SIZES.slice(0, 4);
+      sizes = getSizesForProduct(CATEGORIES.ROPA, id);
     } else {
       name = `Accesorio ${sport.name}`;
       price = 29.99;
     }
+    const fullName = `${name} Pro ${i + 1}`;
+    const colors = pickColors(id, getColorCount(fullName, cat));
 
     products.push({
       sku: `OTH-2024-${String(id).padStart(3, '0')}`,
-      name: `${name} Pro ${i + 1}`,
+      name: fullName,
       slug: `${name.toLowerCase().replace(/\s/g, '-')}-${i + 1}`,
-      description: `Producto profesional de ${sport.name} de alta calidad.`,
+      description: buildDescription(fullName, cat, sport.sportId, sizes, colors, id),
       category_id: cat,
       sport_id: sport.sportId,
       brand_id: [BRANDS.NIKE, BRANDS.ADIDAS, BRANDS.PUMA, null][i % 4],
@@ -468,14 +853,8 @@ export const generate250Products = (): ProductData[] => {
       discount_percentage: i % 7 === 0 ? 20 : 0,
       stock: 40 + Math.floor(Math.random() * 70),
       is_featured: false,
-      images:
-        cat === CATEGORIES.CALZADO ? IMAGES.ZAPATILLAS : IMAGES.ACCESORIOS,
-      variants: sizes.map((size, idx) => ({
-        color: COLORS[idx % 3].name,
-        color_hex: COLORS[idx % 3].hex,
-        size,
-        stock: 10 + Math.floor(Math.random() * 15),
-      })),
+      images: buildImages(fullName, cat, sport.sportId, id, 2),
+      variants: buildVariants(sizes, colors, id, 10),
     });
     id++;
   }
@@ -483,3 +862,4 @@ export const generate250Products = (): ProductData[] => {
   console.log(`✅ Generated ${products.length} products`);
   return products;
 };
+

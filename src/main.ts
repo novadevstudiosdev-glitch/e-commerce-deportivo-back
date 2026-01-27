@@ -9,6 +9,7 @@ import { applySwaggerExtras } from './swagger/swagger-extras';
 import adminRoutes from './modules/admin/routes/admin.routes';
 import meRoutes from './modules/users/routes/me.routes';
 import userRoutes from './modules/users/routes/user.routes';
+import adminUserRoutes from './modules/users/routes/admin.user.routes';
 import adminProductRoutes from './modules/products/routes/admin.product.routes';
 import productRoutes from './modules/products/routes/product.routes';
 import orderRoutes from './modules/orders/routes/order.routes';
@@ -48,13 +49,14 @@ async function bootstrap() {
   expressApp.use('/api', meRoutes);
   expressApp.use('/api', adminRoutes);
   expressApp.use('/api', userRoutes);
+  expressApp.use('/api/admin/users', adminUserRoutes);
   expressApp.use('/api/admin/products', adminProductRoutes);
   expressApp.use('/api', productRoutes);
   expressApp.use('/api', cartRoutes);
   expressApp.use('/api', userOrderRoutes);
   expressApp.use('/api', paymentRoutes);
   expressApp.use(orderRoutes);
-  expressApp.use('/admin/orders', adminOrderRoutes);
+  expressApp.use('/api/admin/orders', adminOrderRoutes);
 
   // CORS
   app.enableCors({

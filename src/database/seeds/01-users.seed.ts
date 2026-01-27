@@ -9,7 +9,8 @@ export class UsersSeed {
     const profileRepo = dataSource.getRepository(UserProfile);
 
     const adminPassword = await bcrypt.hash('Admin123!', 10);
-    const customerPassword = await bcrypt.hash('Customer123!', 10);
+    const usuarioPassword = await bcrypt.hash('Usuario123!', 10);
+    const vendedorPassword = await bcrypt.hash('Vendedor123!', 10);
 
     const seeds = [
       {
@@ -25,13 +26,24 @@ export class UsersSeed {
       },
       {
         email: 'cliente@example.com',
-        password: customerPassword,
-        role: 'customer',
+        password: usuarioPassword,
+        role: 'usuario',
         profile: {
           firstName: 'Carlos',
           lastName: 'Martinez',
           dni: '87654321B',
           phone: '+34698765432',
+        },
+      },
+      {
+        email: 'vendedor@example.com',
+        password: vendedorPassword,
+        role: 'vendedor',
+        profile: {
+          firstName: 'Valeria',
+          lastName: 'Vendedor',
+          dni: '13579246C',
+          phone: '+34655555555',
         },
       },
     ];

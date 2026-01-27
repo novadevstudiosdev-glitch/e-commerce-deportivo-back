@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../../auth/middlewares/auth.middleware';
+import { requireAdmin, requireRole } from '../../auth/middlewares/auth.middleware';
 import {
   getSalesSummary,
   getTopProducts,
@@ -18,71 +18,26 @@ import {
 
 const router = Router();
 
-router.get('/admin/ping', requireAuth, requireRole('admin'), (_req, res) => {
+router.get('/admin/ping', requireAdmin, (_req, res) => {
   return res.json({ ok: true });
 });
 
-router.get(
-  '/admin/stats/summary',
-  requireAuth,
-  requireRole('admin'),
-  getSalesSummary,
-);
+router.get('/admin/stats/summary', requireRole('admin', 'vendedor'), getSalesSummary);
 
-router.get(
-  '/admin/stats/top-products',
-  requireAuth,
-  requireRole('admin'),
-  getTopProducts,
-);
+router.get('/admin/stats/top-products', requireRole('admin', 'vendedor'), getTopProducts);
 
-router.get(
-  '/admin/payments',
-  requireAuth,
-  requireRole('admin'),
-  listPayments,
-);
+router.get('/admin/payments', requireAdmin, listPayments);
 
-router.get(
-  '/admin/payments/pending',
-  requireAuth,
-  requireRole('admin'),
-  listPendingPayments,
-);
+router.get('/admin/payments/pending', requireAdmin, listPendingPayments);
 
-router.get(
-  '/admin/stock-alerts',
-  requireAuth,
-  requireRole('admin'),
-  listLowStock,
-);
+router.get('/admin/stock-alerts', requireRole('admin', 'vendedor'), listLowStock);
 
-router.post(
-  '/admin/coupons',
-  requireAuth,
-  requireRole('admin'),
-  createCoupon,
-);
+router.post('/admin/coupons', requireAdmin, createCoupon);
 
-router.get(
-  '/admin/coupons',
-  requireAuth,
-  requireRole('admin'),
-  listCoupons,
-);
+router.get('/admin/coupons', requireAdmin, listCoupons);
 
-router.put(
-  '/admin/coupons/:id',
-  requireAuth,
-  requireRole('admin'),
-  updateCoupon,
-);
+router.put('/admin/coupons/:id', requireAdmin, updateCoupon);
 
-router.delete(
-  '/admin/coupons/:id',
-  requireAuth,
-  requireRole('admin'),
-  deleteCoupon,
-);
+router.delete('/admin/coupons/:id', requireAdmin, deleteCoupon);
 
 export default router;
