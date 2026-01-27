@@ -669,6 +669,63 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['preferenceId'],
   },
+  MercadoPagoPaymentRequest: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+      token: { type: 'string' },
+      payment_method_id: { type: 'string' },
+      installments: { type: 'integer', minimum: 1 },
+      issuer_id: { type: 'string', nullable: true },
+      payer: {
+        type: 'object',
+        properties: {
+          email: { type: 'string', format: 'email' },
+        },
+        required: ['email'],
+      },
+    },
+    required: ['orderId', 'token', 'payment_method_id', 'installments', 'payer'],
+  },
+  MercadoPagoPaymentResponse: {
+    type: 'object',
+    properties: {
+      paymentId: { type: 'string', nullable: true },
+      status: { type: 'string' },
+      status_detail: { type: 'string', nullable: true },
+      next_action: { type: 'object', nullable: true, additionalProperties: true },
+    },
+    required: ['paymentId', 'status'],
+  },
+  MercadoPagoPaymentStatusResponse: {
+    type: 'object',
+    properties: {
+      paymentId: { type: 'string' },
+      status: { type: 'string' },
+      mp_status: { type: 'string', nullable: true },
+      status_detail: { type: 'string', nullable: true },
+      orderId: { type: 'string', format: 'uuid', nullable: true },
+    },
+    required: ['paymentId', 'status'],
+  },
+  OrderPaymentResponse: {
+    type: 'object',
+    properties: {
+      orderId: { type: 'string', format: 'uuid' },
+      payment: {
+        nullable: true,
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          status: { type: 'string' },
+          provider: { type: 'string' },
+          amount: { type: 'string' },
+          transaction_id: { type: 'string', nullable: true },
+        },
+      },
+    },
+    required: ['orderId', 'payment'],
+  },
   CartCouponRequest: {
     type: 'object',
     properties: {
@@ -1424,6 +1481,46 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/api/payments/mercadopago': {
+    post: {
+      tags: ['payments'],
+      summary: 'Create Mercado Pago payment',
+      security: bearerSecurity,
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('MercadoPagoPaymentRequest'),
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse(ref('MercadoPagoPaymentResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+        '502': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/payments/mercadopago/{paymentId}': {
+    get: {
+      tags: ['payments'],
+      summary: 'Get Mercado Pago payment status',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'paymentId', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('MercadoPagoPaymentStatusResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '502': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/api/payments/mercadopago/webhook': {
     post: {
       tags: ['payments'],
@@ -1432,6 +1529,22 @@ const extraPaths: PathsObject = {
       responses: {
         '200': jsonResponse(ref('OkResponse')),
         '401': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/orders/{orderId}/payment': {
+    get: {
+      tags: ['payments', 'orders'],
+      summary: 'Get order payment',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'orderId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('OrderPaymentResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
       },
     },
   },

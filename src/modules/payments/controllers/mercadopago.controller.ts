@@ -5,8 +5,12 @@ import { Order } from '../../../database/entities/Order';
 import { OrderItem } from '../../../database/entities/OrderItem';
 import { Payment } from '../../../database/entities/Payment';
 import { Product } from '../../../database/entities/Product';
-import { createPreferenceSchema } from '../schemas/mercadopago.schema';
 import {
+  createPaymentSchema,
+  createPreferenceSchema,
+} from '../schemas/mercadopago.schema';
+import {
+  createPayment,
   createPreference,
   getPayment,
   MercadoPagoPayment,
@@ -108,6 +112,15 @@ function mapPaymentStatus(status?: string) {
   }
 }
 
+function resolveOrderIdFromPayment(mpPayment: MercadoPagoPayment) {
+  const metadata = mpPayment.metadata ?? {};
+  return (
+    mpPayment.external_reference ??
+    (typeof metadata.orderId === 'string' ? metadata.orderId : undefined) ??
+    (typeof metadata.order_id === 'string' ? metadata.order_id : undefined)
+  );
+}
+
 function safeEqual(a: string, b: string) {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -153,6 +166,119 @@ function verifyWebhookSignature(req: Request) {
   const hmac = crypto.createHmac('sha256', secret).update(manifest).digest('hex');
 
   return safeEqual(hmac, v1);
+}
+
+export async function createMercadoPagoPayment(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const parsed = createPaymentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue.path.join('.') || 'body';
+    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  }
+
+  await ensureDataSource();
+
+  const orderRepo = AppDataSource.getRepository(Order);
+  const order = await orderRepo.findOne({
+    where: { id: parsed.data.orderId, userId },
+    relations: { payment: true },
+  });
+
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  if (order.status !== 'pendiente_pago') {
+    return res.status(409).json({ error: 'Order is not pending payment' });
+  }
+
+  if (order.payment?.status === 'aprobado') {
+    return res.status(409).json({ error: 'Payment already approved' });
+  }
+
+  const amount = Number(order.total);
+  if (Number.isNaN(amount)) {
+    return res.status(400).json({ error: 'Invalid order total' });
+  }
+
+  const payload = {
+    transaction_amount: amount,
+    token: parsed.data.token,
+    description: `Order ${order.id}`,
+    installments: parsed.data.installments,
+    payment_method_id: parsed.data.payment_method_id,
+    ...(parsed.data.issuer_id ? { issuer_id: parsed.data.issuer_id } : {}),
+    payer: {
+      email: parsed.data.payer.email,
+    },
+    external_reference: order.id,
+    metadata: {
+      orderId: order.id,
+      paymentId: order.payment?.id,
+    },
+    notification_url: buildNotificationUrl(),
+  };
+
+  let mpPayment: MercadoPagoPayment;
+  try {
+    mpPayment = await createPayment(payload);
+  } catch (error) {
+    const details =
+      error instanceof Error ? error.message : 'Mercado Pago request failed';
+    const status =
+      (error as { status?: number } | null | undefined)?.status ?? 500;
+    const data =
+      (error as { data?: unknown } | null | undefined)?.data ?? undefined;
+
+    return res.status(502).json({
+      error: 'Failed to create Mercado Pago payment',
+      details,
+      ...(process.env.NODE_ENV === 'development' ? { mp: data } : {}),
+      status,
+    });
+  }
+
+  const paymentRepo = AppDataSource.getRepository(Payment);
+  const payment =
+    order.payment ??
+    paymentRepo.create({
+      orderId: order.id,
+      provider: 'mercadopago',
+      status: 'pendiente',
+      amount: order.total,
+    });
+
+  payment.provider = 'mercadopago';
+  payment.status = 'pendiente';
+  payment.amount = order.total;
+  payment.transactionId =
+    mpPayment?.id !== undefined && mpPayment?.id !== null
+      ? String(mpPayment.id)
+      : payment.transactionId ?? null;
+  payment.raw = {
+    ...(payment.raw ?? {}),
+    mercado_pago: mpPayment,
+  };
+
+  await paymentRepo.save(payment);
+
+  const nextAction =
+    mpPayment.point_of_interaction ?? mpPayment.three_ds_info ?? null;
+
+  return res.status(201).json({
+    paymentId:
+      mpPayment?.id !== undefined && mpPayment?.id !== null
+        ? String(mpPayment.id)
+        : null,
+    status: mpPayment.status ?? 'unknown',
+    status_detail: mpPayment.status_detail ?? null,
+    next_action: nextAction,
+  });
 }
 
 export async function createMercadoPagoPreference(req: Request, res: Response) {
@@ -319,11 +445,7 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
     return res.status(500).json({ error: 'Failed to fetch Mercado Pago payment' });
   }
 
-  const metadata = mpPayment.metadata ?? {};
-  const orderId =
-    mpPayment.external_reference ??
-    (typeof metadata.orderId === 'string' ? metadata.orderId : undefined) ??
-    (typeof metadata.order_id === 'string' ? metadata.order_id : undefined);
+  const orderId = resolveOrderIdFromPayment(mpPayment);
   if (!orderId) {
     return res.json({ ok: true });
   }
@@ -476,4 +598,83 @@ export async function mercadoPagoWebhook(req: Request, res: Response) {
   }
 
   return res.json({ ok: true });
+}
+
+export async function getMercadoPagoPaymentStatus(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { paymentId } = req.params;
+  if (!paymentId || Array.isArray(paymentId)) {
+    return res.status(400).json({ error: 'Invalid payment id' });
+  }
+
+  await ensureDataSource();
+
+  const paymentRepo = AppDataSource.getRepository(Payment);
+  const paymentRecord = await paymentRepo.findOne({
+    where: { transactionId: String(paymentId) },
+    relations: { order: true },
+  });
+
+  if (!paymentRecord || paymentRecord.order?.userId !== userId) {
+    return res.status(404).json({ error: 'Payment not found' });
+  }
+
+  let mpPayment: MercadoPagoPayment;
+  try {
+    mpPayment = await getPayment(paymentId);
+  } catch (error) {
+    return res.status(502).json({ error: 'Failed to fetch Mercado Pago payment' });
+  }
+
+  const orderId =
+    resolveOrderIdFromPayment(mpPayment) ?? paymentRecord.orderId ?? null;
+
+  return res.json({
+    paymentId: mpPayment?.id ? String(mpPayment.id) : String(paymentId),
+    status: mapPaymentStatus(mpPayment.status),
+    mp_status: mpPayment.status ?? null,
+    status_detail: mpPayment.status_detail ?? null,
+    orderId,
+  });
+}
+
+export async function getOrderPayment(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { orderId } = req.params;
+  if (!orderId || Array.isArray(orderId)) {
+    return res.status(400).json({ error: 'Invalid order id' });
+  }
+
+  await ensureDataSource();
+
+  const orderRepo = AppDataSource.getRepository(Order);
+  const order = await orderRepo.findOne({
+    where: { id: orderId, userId },
+    relations: { payment: true },
+  });
+
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  return res.json({
+    orderId: order.id,
+    payment: order.payment
+      ? {
+          id: order.payment.id,
+          status: order.payment.status,
+          provider: order.payment.provider,
+          amount: order.payment.amount,
+          transaction_id: order.payment.transactionId,
+        }
+      : null,
+  });
 }
