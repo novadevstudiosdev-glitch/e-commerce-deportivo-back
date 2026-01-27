@@ -17,6 +17,7 @@ import cartRoutes from './modules/cart/routes/cart.routes';
 import userOrderRoutes from './modules/orders/routes/user.orders.routes';
 import adminOrderRoutes from './modules/orders/routes/admin.order.routes';
 import paymentRoutes from './modules/payments/routes/payment.routes';
+import shippingRoutes from './modules/shipping/routes/shipping.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -55,6 +56,7 @@ async function bootstrap() {
   expressApp.use('/api', cartRoutes);
   expressApp.use('/api', userOrderRoutes);
   expressApp.use('/api', paymentRoutes);
+  expressApp.use('/api', shippingRoutes);
   expressApp.use('/api', orderRoutes);
   expressApp.use('/api/admin/orders', adminOrderRoutes);
 
@@ -87,6 +89,7 @@ async function bootstrap() {
     .addTag('orders', 'Order management')
     .addTag('cart', 'Cart operations')
     .addTag('payments', 'Payment operations')
+    .addTag('shipping', 'Shipping operations')
     .addTag('admin', 'Admin operations')
     .addTag('system', 'System utilities')
     .addTag('notifications', 'Notifications')
