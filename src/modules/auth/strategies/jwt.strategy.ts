@@ -35,10 +35,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return fallback;
     };
 
+    const secret = readString('JWT_SECRET', 'your-secret-key') ?? 'your-secret-key';
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: readString('JWT_SECRET', 'your-secret-key'),
+      secretOrKey: secret,
     });
   }
 
