@@ -238,6 +238,54 @@ const schemas: Record<string, SchemaObject> = {
     },
     required: ['id', 'email', 'role', 'email_verified', 'profile', 'addresses'],
   },
+  AdminUserResponse: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      email: { type: 'string', format: 'email' },
+      role: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] },
+      is_active: { type: 'boolean' },
+      email_verified: { type: 'boolean' },
+      profile: ref('UserProfile'),
+      created_at: { type: 'string', format: 'date-time' },
+      updated_at: { type: 'string', format: 'date-time' },
+    },
+    required: [
+      'id',
+      'email',
+      'role',
+      'is_active',
+      'email_verified',
+      'profile',
+      'created_at',
+      'updated_at',
+    ],
+  },
+  AdminUsersListResponse: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer' },
+      limit: { type: 'integer' },
+      total: { type: 'integer' },
+      data: { type: 'array', items: ref('AdminUserResponse') },
+    },
+    required: ['page', 'limit', 'total', 'data'],
+  },
+  AdminUserUpdateRequest: {
+    type: 'object',
+    properties: {
+      email: { type: 'string', format: 'email' },
+      role: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] },
+      is_active: { type: 'boolean' },
+      email_verified: { type: 'boolean' },
+      first_name: { type: 'string', minLength: 2 },
+      last_name: { type: 'string', minLength: 2 },
+      dni: { type: 'string', nullable: true },
+      phone: { type: 'string', nullable: true },
+      date_of_birth: { type: 'string', format: 'date', nullable: true },
+      avatar_url: { type: 'string', format: 'uri', nullable: true },
+    },
+  },
   UpdateMeRequest: {
     type: 'object',
     properties: {
@@ -526,6 +574,45 @@ const schemas: Record<string, SchemaObject> = {
           required: ['id', 'status', 'total', 'currency', 'created_at'],
         },
       },
+    },
+    required: ['page', 'limit', 'total', 'data'],
+  },
+  AdminOrderListItem: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      status: { type: 'string' },
+      subtotal: { type: 'string' },
+      total: { type: 'string' },
+      currency: { type: 'string' },
+      created_at: { type: 'string', format: 'date-time' },
+      shipping: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string', nullable: true },
+          type: { type: 'string', nullable: true },
+          price: { type: 'string', nullable: true },
+        },
+      },
+      payment: {
+        type: 'object',
+        nullable: true,
+        properties: {
+          status: { type: 'string' },
+          provider: { type: 'string' },
+          amount: { type: 'string' },
+        },
+      },
+    },
+    required: ['id', 'status', 'total', 'currency', 'created_at'],
+  },
+  AdminOrdersListResponse: {
+    type: 'object',
+    properties: {
+      page: { type: 'integer' },
+      limit: { type: 'integer' },
+      total: { type: 'integer' },
+      data: { type: 'array', items: ref('AdminOrderListItem') },
     },
     required: ['page', 'limit', 'total', 'data'],
   },
@@ -1414,6 +1501,90 @@ const extraPaths: PathsObject = {
       },
     },
   },
+  '/api/admin/users': {
+    get: {
+      tags: ['admin', 'users'],
+      summary: 'List users',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+        { name: 'q', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'role', in: 'query', required: false, schema: { type: 'string', enum: ['admin', 'usuario', 'vendedor'] } },
+        { name: 'is_active', in: 'query', required: false, schema: { type: 'boolean' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('AdminUsersListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/users/{id}': {
+    patch: {
+      tags: ['admin', 'users'],
+      summary: 'Update user by id',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: ref('AdminUserUpdateRequest'),
+          },
+        },
+      },
+      responses: {
+        '200': jsonResponse(ref('AdminUserResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+        '404': jsonResponse(ref('ErrorResponse')),
+        '409': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
+  '/api/admin/orders': {
+    get: {
+      tags: ['admin', 'orders'],
+      summary: 'List orders',
+      security: bearerSecurity,
+      parameters: [
+        { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+        {
+          name: 'orderStatus',
+          in: 'query',
+          required: false,
+          schema: {
+            type: 'string',
+            enum: ['pendiente_pago', 'pagado', 'en_preparacion', 'enviado', 'entregado', 'reembolsado'],
+          },
+        },
+        {
+          name: 'paymentStatus',
+          in: 'query',
+          required: false,
+          schema: {
+            type: 'string',
+            enum: ['pendiente', 'aprobado', 'rechazado', 'reembolsado'],
+          },
+        },
+        { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
+        { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['newest', 'oldest'], default: 'newest' } },
+      ],
+      responses: {
+        '200': jsonResponse(ref('AdminOrdersListResponse')),
+        '400': jsonResponse(ref('ErrorResponse')),
+        '401': jsonResponse(ref('ErrorResponse')),
+        '403': jsonResponse(ref('ErrorResponse')),
+      },
+    },
+  },
   '/api/cart': {
     get: {
       tags: ['cart'],
@@ -1880,7 +2051,7 @@ const extraPaths: PathsObject = {
       },
     },
   },
-  '/admin/orders/{orderId}/payment': {
+  '/api/admin/orders/{orderId}/payment': {
     patch: {
       tags: ['admin', 'orders'],
       summary: 'Update payment status',
@@ -1912,7 +2083,7 @@ const extraPaths: PathsObject = {
       },
     },
   },
-  '/admin/orders/{orderId}/status': {
+  '/api/admin/orders/{orderId}/status': {
     patch: {
       tags: ['admin', 'orders'],
       summary: 'Update order shipping status',

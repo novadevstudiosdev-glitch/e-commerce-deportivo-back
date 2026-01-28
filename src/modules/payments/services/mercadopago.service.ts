@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 const MP_API_BASE = process.env.MP_API_BASE ?? 'https://api.mercadopago.com';
 
 function getAccessToken() {
@@ -112,6 +114,9 @@ export function createPayment(payload: MercadoPagoPaymentPayload) {
   return mpRequest<MercadoPagoPayment>('/v1/payments', {
     method: 'POST',
     body: JSON.stringify(payload),
+    headers: {
+      'X-Idempotency-Key': randomUUID(),
+    },
   });
 }
 

@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import express from 'express';
@@ -6,6 +6,8 @@ import passport from 'passport';
 import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { applySwaggerExtras } from './swagger/swagger-extras';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import adminRoutes from './modules/admin/routes/admin.routes';
 import meRoutes from './modules/users/routes/me.routes';
 import userRoutes from './modules/users/routes/user.routes';
@@ -21,9 +23,15 @@ import shippingRoutes from './modules/shipping/routes/shipping.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const reflector = app.get(Reflector);
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  app.useGlobalGuards(
+    new JwtAuthGuard(reflector),
+    new RolesGuard(reflector),
+  );
 
   // Passport
   app.use(passport.initialize());

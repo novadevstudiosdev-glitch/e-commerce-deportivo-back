@@ -26,6 +26,7 @@ import crypto from 'crypto';
 import passport from 'passport';
 import type { NextFunction, Request, Response } from 'express';
 import { IsNull, MoreThan, Repository } from 'typeorm';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -55,6 +56,7 @@ import {
 } from '../../common/utils/cart-session';
 
 @ApiTags('auth')
+@Public()
 @Controller('auth')
 export class AuthController {
   private readonly cooldowns = new Map<string, number>();

@@ -30,7 +30,7 @@ router.get('/admin/payments', requireAdmin, listPayments);
 
 router.get('/admin/payments/pending', requireAdmin, listPendingPayments);
 
-router.get('/admin/stock-alerts', requireRole('admin', 'vendedor'), listLowStock);
+router.get('/admin/stock-alerts', requireAdmin, listLowStock);
 
 router.post('/admin/coupons', requireAdmin, createCoupon);
 
