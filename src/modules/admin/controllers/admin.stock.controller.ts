@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { AppDataSource } from '../../../database/data-source';
 import { Product } from '../../../database/entities/Product';
 import { stockAlertQuerySchema } from '../schemas/stock-alert.schema';
-import { ensureStaff } from '../../../common/utils/ensure-staff';
+import { ensureAdmin } from '../../../common/utils/ensure-admin';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -19,7 +19,7 @@ async function ensureDataSource() {
 }
 
 export async function listLowStock(req: Request, res: Response) {
-  if (!ensureStaff(req, res)) {
+  if (!ensureAdmin(req, res)) {
     return;
   }
 

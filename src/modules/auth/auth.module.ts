@@ -12,6 +12,7 @@ import { GoogleStrategy } from '../../config/passport';
 import { EmailService } from '../../common/services/email.service';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
@@ -47,7 +48,7 @@ import { AuthController } from './auth.controller';
       },
     }),
   ],
-  providers: [AuthService, GoogleStrategy, EmailService],
+  providers: [AuthService, GoogleStrategy, EmailService, JwtStrategy],
   controllers: [AuthController],
 })
 export class AuthModule {}
