@@ -206,6 +206,12 @@ export async function createMercadoPagoPayment(req: Request, res: Response) {
     return res.status(400).json({ error: 'Invalid order total' });
   }
 
+  const envPayerEmail = (process.env.MP_PAYER_EMAIL || '').trim();
+  const payerEmail = envPayerEmail || parsed.data.payer.email;
+  if (!payerEmail) {
+    return res.status(400).json({ error: 'Missing payer email' });
+  }
+
   const payload = {
     transaction_amount: amount,
     token: parsed.data.token,
@@ -214,7 +220,7 @@ export async function createMercadoPagoPayment(req: Request, res: Response) {
     payment_method_id: parsed.data.payment_method_id,
     ...(parsed.data.issuer_id ? { issuer_id: parsed.data.issuer_id } : {}),
     payer: {
-      email: parsed.data.payer.email,
+      email: payerEmail,
     },
     external_reference: order.id,
     metadata: {
@@ -223,6 +229,9 @@ export async function createMercadoPagoPayment(req: Request, res: Response) {
     },
     notification_url: buildNotificationUrl(),
   };
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[MercadoPago] Payer email used:', payerEmail);
+  }
 
   let mpPayment: MercadoPagoPayment;
   try {
