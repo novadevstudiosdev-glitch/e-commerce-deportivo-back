@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 // import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EmailModule } from './modules/email/email.module';
+import { ShippingModule } from './modules/shipping/shipping.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { EmailModule } from './modules/email/email.module';
     // NotificationsModule,
     DashboardModule,
     EmailModule,
+    ShippingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
