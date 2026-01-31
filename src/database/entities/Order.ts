@@ -78,6 +78,9 @@ export class Order {
   @Column({ name: 'shipping_meta', type: 'jsonb', nullable: true })
   shippingMeta: Record<string, unknown> | null;
 
+  @Column({ name: 'shipping_address', type: 'jsonb', nullable: true })
+  shippingAddress: Record<string, unknown> | null;
+
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 

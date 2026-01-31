@@ -13,6 +13,7 @@ import meRoutes from './modules/users/routes/me.routes';
 import userRoutes from './modules/users/routes/user.routes';
 import adminUserRoutes from './modules/users/routes/admin.user.routes';
 import adminProductRoutes from './modules/products/routes/admin.product.routes';
+import adminCatalogRoutes from './modules/products/routes/admin.catalog.routes';
 import productRoutes from './modules/products/routes/product.routes';
 import orderRoutes from './modules/orders/routes/order.routes';
 import cartRoutes from './modules/cart/routes/cart.routes';
@@ -60,6 +61,7 @@ async function bootstrap() {
   expressApp.use('/api', userRoutes);
   expressApp.use('/api/admin/users', adminUserRoutes);
   expressApp.use('/api/admin/products', adminProductRoutes);
+  expressApp.use('/api/admin/catalog', adminCatalogRoutes);
   expressApp.use('/api', productRoutes);
   expressApp.use('/api', cartRoutes);
   expressApp.use('/api', userOrderRoutes);

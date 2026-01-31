@@ -18,12 +18,12 @@ async function ensureDataSource() {
   await dataSourceInit;
 }
 
-export async function listPayments(req: Request, res: Response) {
+async function listPaymentsCore(req: Request, res: Response, query: Request['query']) {
   if (!ensureAdmin(req, res)) {
     return;
   }
 
-  const parsed = paymentsQuerySchema.safeParse(req.query);
+  const parsed = paymentsQuerySchema.safeParse(query);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = issue.path.join('.') || 'query';
@@ -88,8 +88,11 @@ export async function listPayments(req: Request, res: Response) {
   });
 }
 
+export async function listPayments(req: Request, res: Response) {
+  return listPaymentsCore(req, res, req.query);
+}
+
 export async function listPendingPayments(req: Request, res: Response) {
-  const query = { ...req.query, status: 'pendiente' };
-  req.query = query as typeof req.query;
-  return listPayments(req, res);
+  const query = { ...req.query, status: 'pendiente' } as Request['query'];
+  return listPaymentsCore(req, res, query);
 }

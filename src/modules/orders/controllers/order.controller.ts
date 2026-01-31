@@ -8,7 +8,7 @@ import { Order } from '../../../database/entities/Order';
 import { OrderItem } from '../../../database/entities/OrderItem';
 import { Payment } from '../../../database/entities/Payment';
 import { Product } from '../../../database/entities/Product';
-import { createOrderSchema } from '../schemas/order.schema';
+import { createOrderSchema, shippingAddressSchema } from '../schemas/order.schema';
 
 let dataSourceInit: Promise<void> | null = null;
 
@@ -167,7 +167,7 @@ export async function createOrder(req: Request, res: Response) {
     return res.status(400).json({ error: `${field}: ${issue.message}` });
   }
 
-  const { items, notes, coupon_code } = parsed.data;
+  const { items, notes, coupon_code, shipping_address } = parsed.data;
   const consolidated = consolidateItems(items);
 
   await ensureDataSource();
@@ -249,6 +249,7 @@ export async function createOrder(req: Request, res: Response) {
       discountTotal,
       total,
       notes: notes ?? null,
+      shippingAddress: shipping_address ?? null,
     });
 
     const savedOrder = await orderRepo.save(order);
@@ -283,6 +284,7 @@ export async function createOrder(req: Request, res: Response) {
     status: result.order.status,
     total: result.order.total,
     discount_total: result.order.discountTotal,
+    shipping_address: result.order.shippingAddress ?? null,
     items: result.items.map((item) => ({
       productId: item.productId,
       product_name: item.productName,
@@ -299,6 +301,22 @@ export async function createOrderFromCart(req: Request, res: Response) {
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  const shippingAddressRaw = (req.body as { shipping_address?: unknown } | undefined)
+    ?.shipping_address;
+  if (shippingAddressRaw !== undefined) {
+    const shippingParsed = shippingAddressSchema.safeParse(shippingAddressRaw);
+    if (!shippingParsed.success) {
+      const issue = shippingParsed.error.issues[0];
+      const field = issue.path.join('.') || 'shipping_address';
+      return res.status(400).json({ error: `${field}: ${issue.message}` });
+    }
+  }
+
+  const shippingAddress =
+    shippingAddressRaw !== undefined
+      ? (shippingAddressSchema.parse(shippingAddressRaw) as Record<string, unknown>)
+      : null;
 
   await ensureDataSource();
 
@@ -384,6 +402,7 @@ export async function createOrderFromCart(req: Request, res: Response) {
       discountTotal,
       total,
       notes: null,
+      shippingAddress,
     });
 
     const savedOrder = await orderRepo.save(order);
@@ -421,6 +440,7 @@ export async function createOrderFromCart(req: Request, res: Response) {
     status: result.order.status,
     total: result.order.total,
     discount_total: result.order.discountTotal,
+    shipping_address: result.order.shippingAddress ?? null,
     items: result.items.map((item) => ({
       productId: item.productId,
       product_name: item.productName,

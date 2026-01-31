@@ -97,6 +97,7 @@ export async function listAdminOrders(req: Request, res: Response) {
     total: order.total,
     currency: order.currency,
     created_at: order.createdAt,
+    shipping_address: order.shippingAddress ?? null,
     shipping: {
       provider: order.shippingProvider,
       type: order.shippingType,

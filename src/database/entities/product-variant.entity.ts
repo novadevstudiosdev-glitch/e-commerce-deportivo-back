@@ -1,0 +1,1 @@
+export { ProductVariant } from './ProductVariant';

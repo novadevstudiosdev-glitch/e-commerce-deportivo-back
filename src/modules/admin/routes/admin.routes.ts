@@ -18,7 +18,7 @@ import {
 
 const router = Router();
 
-router.get('/admin/ping', requireAdmin, (_req, res) => {
+router.get('/admin/ping', requireRole('admin', 'vendedor'), (_req, res) => {
   return res.json({ ok: true });
 });
 

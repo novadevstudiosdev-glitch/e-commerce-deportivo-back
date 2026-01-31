@@ -66,7 +66,7 @@ import { ShippingModule } from './modules/shipping/shipping.module';
           ssl: useSsl ? { rejectUnauthorized: false } : undefined,
           extra: useSsl ? { ssl: { rejectUnauthorized: false } } : undefined,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
-          synchronize: nodeEnv === 'development',
+          synchronize: false,
           logging: nodeEnv === 'development',
         };
       },

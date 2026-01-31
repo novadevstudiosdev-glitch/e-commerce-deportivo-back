@@ -1,11 +1,12 @@
 import type { Request, Response } from 'express';
 import { AppDataSource } from '../../../database/data-source';
 import { Product } from '../../../database/entities/Product';
-import {
-  productCreateSchema,
-  productUpdateSchema,
-} from '../schemas/product.schema';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { CreateAdminProductDto } from '../dtos/admin-create-product.dto';
+import { adminProductService } from '../services/admin.product.service';
 import { ensureStaff } from '../../../common/utils/ensure-staff';
+import { ensureAdmin } from '../../../common/utils/ensure-admin';
 import { adminProductQuerySchema } from '../schemas/admin.product.query.schema';
 
 let dataSourceInit: Promise<void> | null = null;
@@ -22,22 +23,15 @@ async function ensureDataSource() {
   await dataSourceInit;
 }
 
-function normalizeProductInput<
-  T extends { name?: string; category?: string; target?: string },
->(data: T) {
-  return {
-    ...data,
-    name: data.name?.trim(),
-    category: data.category?.trim(),
-    target: data.target?.trim(),
-  };
-}
-
 function mapProduct(product: Product) {
   return {
     id: product.id,
     name: product.name,
+    slug: product.slug,
     description: product.description,
+    category_id: product.categoryId,
+    brand_id: product.brandId,
+    sport_id: product.sportId,
     price: product.price,
     currency: product.currency,
     stock: product.stock,
@@ -53,42 +47,48 @@ function mapProduct(product: Product) {
   };
 }
 
+function flattenValidationErrors(errors: Array<{ property: string; constraints?: Record<string, string>; children?: any[] }>, parent = '') {
+  const results: Array<{ field: string; message: string }> = [];
+  for (const error of errors) {
+    const field = parent ? `${parent}.${error.property}` : error.property;
+    if (error.constraints) {
+      const message = Object.values(error.constraints)[0];
+      results.push({ field, message });
+    }
+    if (error.children && error.children.length > 0) {
+      results.push(...flattenValidationErrors(error.children, field));
+    }
+  }
+  return results;
+}
+
 export async function createProduct(req: Request, res: Response) {
-  if (!ensureStaff(req, res)) {
+  if (!ensureAdmin(req, res)) {
     return;
   }
 
-  const parsed = productCreateSchema.safeParse(req.body);
-
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const field = issue.path.join('.') || 'body';
-    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  /**
+   * curl -X POST http://localhost:3000/api/admin/products \
+   *  -H "Authorization: Bearer <token>" \
+   *  -H "Content-Type: application/json" \
+   *  -d '{ "name":"Remera Ciclismo Pro 23","description":"...","category_id":"<uuid>","images":[{"url":"https://...","is_main":true,"sort_order":1}],"variants":[{"size_id":"<uuid>","color_id":"<uuid>","base_price":74000.99,"discount_percentage":0,"stock":10,"low_stock_threshold":2}] }'
+   */
+  const payload = plainToInstance(CreateAdminProductDto, req.body);
+  const errors = await validate(payload, { whitelist: true, forbidNonWhitelisted: true });
+  if (errors.length > 0) {
+    const first = flattenValidationErrors(errors)[0];
+    return res.status(400).json({
+      error: `${first?.field || 'body'}: ${first?.message || 'Validation error'}`,
+    });
   }
 
-  const payload = normalizeProductInput(parsed.data);
-
-  await ensureDataSource();
-
-  const repo = AppDataSource.getRepository(Product);
-
-  const product = repo.create({
-    name: payload.name,
-    description: payload.description,
-    price: payload.price,
-    currency: payload.currency ?? 'ARS',
-    stock: payload.stock ?? 0,
-    discountPercent: payload.discount_percent ?? 0,
-    lowStockThreshold: payload.low_stock_threshold ?? 10,
-    category: payload.category,
-    target: payload.target,
-    images: payload.images ?? null,
-    isActive: payload.is_active ?? true,
-    isFeatured: payload.is_featured ?? false,
-  });
-
-  const saved = await repo.save(product);
-  return res.status(201).json(mapProduct(saved));
+  try {
+    const created = await adminProductService.createProductWithVariants(payload);
+    return res.status(201).json(created);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create product';
+    return res.status(400).json({ error: message });
+  }
 }
 
 export async function getProductById(req: Request, res: Response) {
@@ -102,16 +102,13 @@ export async function getProductById(req: Request, res: Response) {
     return res.status(400).json({ error: 'Invalid id' });
   }
 
-  await ensureDataSource();
-
-  const repo = AppDataSource.getRepository(Product);
-  const product = await repo.findOne({ where: { id } });
+  const product = await adminProductService.getProductDetail(id);
 
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  return res.json(mapProduct(product));
+  return res.json(product);
 }
 
 export async function updateProductById(req: Request, res: Response) {
@@ -125,74 +122,25 @@ export async function updateProductById(req: Request, res: Response) {
     return res.status(400).json({ error: 'Invalid id' });
   }
 
-  const parsed = productUpdateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const field = issue.path.join('.') || 'body';
-    return res.status(400).json({ error: `${field}: ${issue.message}` });
+  const payload = plainToInstance(CreateAdminProductDto, req.body);
+  const errors = await validate(payload, { whitelist: true, forbidNonWhitelisted: true });
+  if (errors.length > 0) {
+    const first = flattenValidationErrors(errors)[0];
+    return res.status(400).json({
+      error: `${first?.field || 'body'}: ${first?.message || 'Validation error'}`,
+    });
   }
 
-  const payload = normalizeProductInput(parsed.data);
-
-  await ensureDataSource();
-
-  const repo = AppDataSource.getRepository(Product);
-  const product = await repo.findOne({ where: { id } });
-
-  if (!product) {
-    return res.status(404).json({ error: 'Product not found' });
-  }
-
-  if (payload.name !== undefined) {
-    product.name = payload.name;
-  }
-  if (payload.description !== undefined) {
-    product.description = payload.description;
-  }
-  if (payload.price !== undefined) {
-    product.price = payload.price;
-  }
-  if (payload.currency !== undefined) {
-    product.currency = payload.currency;
-  }
-  if (payload.stock !== undefined) {
-    if (payload.stock < 0) {
-      return res.status(400).json({ error: 'Stock must be >= 0' });
+  try {
+    const updated = await adminProductService.updateProductWithVariants(id, payload);
+    if (!updated) {
+      return res.status(404).json({ error: 'Product not found' });
     }
-    product.stock = payload.stock;
+    return res.json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update product';
+    return res.status(400).json({ error: message });
   }
-  if (payload.discount_percent !== undefined) {
-    if (payload.discount_percent < 0 || payload.discount_percent > 100) {
-      return res
-        .status(400)
-        .json({ error: 'Discount percent must be between 0 and 100' });
-    }
-    product.discountPercent = payload.discount_percent;
-  }
-  if (payload.low_stock_threshold !== undefined) {
-    if (payload.low_stock_threshold < 0) {
-      return res.status(400).json({ error: 'Low stock threshold must be >= 0' });
-    }
-    product.lowStockThreshold = payload.low_stock_threshold;
-  }
-  if (payload.category !== undefined) {
-    product.category = payload.category;
-  }
-  if (payload.target !== undefined) {
-    product.target = payload.target;
-  }
-  if (payload.images !== undefined) {
-    product.images = payload.images;
-  }
-  if (payload.is_active !== undefined) {
-    product.isActive = payload.is_active;
-  }
-  if (payload.is_featured !== undefined) {
-    product.isFeatured = payload.is_featured;
-  }
-
-  const saved = await repo.save(product);
-  return res.json(mapProduct(saved));
 }
 
 export async function deleteProductById(req: Request, res: Response) {
